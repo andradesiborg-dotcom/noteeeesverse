@@ -3,7 +3,6 @@ import {
   Mic,
   Square,
   Upload,
-  FileAudio,
   Globe2,
   Sparkles,
   Copy,
@@ -19,13 +18,6 @@ import {
   Crown,
   User,
   LogOut,
-  Edit3,
-  Mail,
-  HelpCircle,
-  CheckCircle2,
-  CreditCard,
-  QrCode,
-  Lock,
 } from 'lucide-react';
 
 interface SavedNote {
@@ -70,11 +62,12 @@ export default function App() {
   const [isProcessingPayment, setIsProcessingPayment] =
     useState<boolean>(false);
 
-  // Gravador e Áudio
+  // Gravador, Áudio e Nível de Voz
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [audioLevel, setAudioLevel] = useState<number>(10); // Nível do volume da voz (0 a 100)
 
   // Título Personalizado
   const [customTitle, setCustomTitle] = useState<string>('');
@@ -103,6 +96,9 @@ export default function App() {
 
   const timerRef = useRef<any>(null);
   const recognitionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     const localData = localStorage.getItem('noteverse_saved');
@@ -138,8 +134,56 @@ export default function App() {
     return () => clearInterval(timerRef.current);
   }, [isRecording, user]);
 
+  const stopAudioAnalysis = () => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+  };
+
+  const startAudioAnalysis = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const AudioContextClass =
+        window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      audioContextRef.current = audioCtx;
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateLevel = () => {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / dataArray.length;
+        // Normaliza o nível entre 15 e 100
+        setAudioLevel(Math.max(15, Math.min(100, average * 1.5)));
+        animFrameRef.current = requestAnimationFrame(updateLevel);
+      };
+
+      updateLevel();
+    } catch (e) {
+      console.warn('Não foi possível acessar o microfone para o visualizador de voz.', e);
+    }
+  };
+
   const handleStopRecordingDueToLimit = () => {
     if (recognitionRef.current) recognitionRef.current.stop();
+    stopAudioAnalysis();
     setIsRecording(false);
     setShowPaywall(true);
   };
@@ -147,10 +191,12 @@ export default function App() {
   const handleToggleRecord = () => {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
+      stopAudioAnalysis();
       setIsRecording(false);
     } else {
       setRecordingTime(0);
       setAudioUrl(null);
+      startAudioAnalysis();
 
       const SpeechRecognition =
         (window as any).SpeechRecognition ||
@@ -180,6 +226,7 @@ export default function App() {
         setIsRecording(true);
         setTimeout(() => {
           setIsRecording(false);
+          stopAudioAnalysis();
           setCustomTitle('Gravação de Voz');
         }, 3000);
       }
@@ -207,10 +254,11 @@ export default function App() {
     }
   };
 
-  // Botão Gerar: Se estiver a gravar, para automaticamente e gera o conteúdo
+  // Botão Gerar: Para a gravação se estiver ativa e processa
   const handleGenerateContent = () => {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
+      stopAudioAnalysis();
       setIsRecording(false);
     }
 
@@ -218,14 +266,14 @@ export default function App() {
 
     setTimeout(() => {
       const generatedText =
-        'Nota gerada com sucesso! O sistema processou o seu áudio e estruturou todas as informações detalhadas.';
+        'Nota gerada com sucesso! O sistema processou o áudio capturado e estruturou todas as informações.';
       setTranscription(generatedText);
       setTranslation(`[English Translation]: Successfully generated note based on audio input.`);
       setSummary({
         overview: 'Resumo executivo gerado automaticamente a partir do áudio.',
         keyPoints: [
-          'Áudio processado e validado com sucesso',
-          'Tradução e sumário estruturados em tempo real',
+          'Áudio capturado e analisado em tempo real',
+          'Tradução e síntese executiva criadas com sucesso',
         ],
       });
       setIsProcessing(false);
@@ -456,15 +504,21 @@ export default function App() {
                 )}
               </div>
 
-              {/* INDICADOR DE MOVIMENTO DE FALA (ONDAS SONORAS) */}
+              {/* ONDAS SONORAS REATIVAS Á VOZ */}
               {isRecording ? (
-                <div className="flex items-center justify-center gap-1 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <span className="text-xs text-red-400 font-bold mr-2">A gravar voz...</span>
-                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-4" style={{ animationDelay: '0s' }}></div>
-                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-6" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-3" style={{ animationDelay: '0.4s' }}></div>
-                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-7" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-5" style={{ animationDelay: '0.3s' }}></div>
+                <div className="flex flex-col items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                  <span className="text-xs text-red-400 font-bold">Captando voz...</span>
+                  <div className="flex items-center gap-1.5 h-8">
+                    {[0.6, 1, 0.4, 0.8, 1.2, 0.7, 0.5, 0.9, 0.3].map((factor, idx) => (
+                      <div
+                        key={idx}
+                        className="w-1.5 bg-red-400 rounded-full transition-all duration-75"
+                        style={{
+                          height: `${Math.min(32, Math.max(6, audioLevel * factor))}px`,
+                        }}
+                      ></div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2.5">
@@ -501,17 +555,17 @@ export default function App() {
                 </div>
               )}
 
-              {/* Se estiver a gravar, mostra também o botão de parar separado opcionalmente, ou foca no Gerar */}
+              {/* Botão de Pausar Gravação Manual */}
               {isRecording && (
                 <button
                   onClick={handleToggleRecord}
                   className="w-full py-1.5 bg-red-500/20 text-red-400 text-xs font-bold rounded-xl border border-red-500/30 hover:bg-red-500/30"
                 >
-                  Parar Gravação Manualmente
+                  Pausar Gravação
                 </button>
               )}
 
-              {/* BOTÃO GERAR COM PONTINHOS EM MOVIMENTO */}
+              {/* BOTÃO GERAR */}
               <button
                 disabled={isProcessing}
                 onClick={handleGenerateContent}
