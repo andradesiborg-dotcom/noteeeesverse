@@ -106,13 +106,6 @@ export default function App() {
   const timerRef = useRef<any>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Preço Dinâmico baseado no Plano
-  const planPrices = {
-    monthly: { total: '29,90', label: 'R$ 29,90 / mês' },
-    quarterly: { total: '71,70', label: 'R$ 71,70 por trimestre' },
-    annual: { total: '214,80', label: 'R$ 214,80 por ano (R$ 17,90/mês)' },
-  };
-
   useEffect(() => {
     const localData = localStorage.getItem('noteverse_saved');
     if (localData) {
@@ -129,7 +122,7 @@ export default function App() {
     }
   }, []);
 
-  // Timer de Gravação (Trava em 60s se for FREE)
+  // Timer de Gravação
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
@@ -442,236 +435,204 @@ export default function App() {
           style={{ backgroundColor: colors.bgFrame }}
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
         >
-          {activeTab !== 'saved' ? (
-            <>
-              {/* Estúdio de Entrada */}
+          {/* Estúdio de Entrada (Exibido em todas as abas exceto 'saved') */}
+          {activeTab !== 'saved' && (
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border p-4 rounded-2xl shadow-lg space-y-3"
+            >
               <div
-                style={{
-                  backgroundColor: colors.cardBg,
-                  borderColor: colors.cardBorder,
-                }}
-                className="border p-4 rounded-2xl shadow-lg space-y-3"
+                style={{ color: colors.titleText }}
+                className="text-[11px] font-bold uppercase tracking-wider flex items-center justify-between"
               >
-                <div
-                  style={{ color: colors.titleText }}
-                  className="text-[11px] font-bold uppercase tracking-wider flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Volume2 size={14} /> Estúdio de Entrada
+                <span className="flex items-center gap-1.5">
+                  <Volume2 size={14} /> Estúdio de Entrada
+                </span>
+                {isRecording && (
+                  <span className="text-red-400 font-mono text-xs font-bold animate-pulse">
+                    {recordingTime}s / 60s
                   </span>
-                  {isRecording && (
-                    <span className="text-red-400 font-mono text-xs font-bold animate-pulse">
-                      {recordingTime}s / 60s
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-center gap-2.5">
-                  <button
-                    onClick={handleToggleRecord}
-                    style={{
-                      backgroundColor: isRecording
-                        ? 'rgba(239, 68, 68, 0.2)'
-                        : isDark
-                        ? '#231522'
-                        : '#fef2f2',
-                      color: '#f87171',
-                      borderColor: isDark ? '#451a28' : '#fecaca',
-                    }}
-                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border shadow-sm cursor-pointer"
-                  >
-                    {isRecording ? <Square size={14} /> : <Mic size={14} />}
-                    <span>{isRecording ? 'Parar' : 'Gravar Voz'}</span>
-                  </button>
-
-                  <label
-                    style={{
-                      backgroundColor: isDark ? '#0f2b3c' : '#f0f9ff',
-                      color: isDark ? '#38bdf8' : '#0284c7',
-                      borderColor: isDark ? '#164e63' : '#bae6fd',
-                    }}
-                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all hover:opacity-90"
-                  >
-                    <Upload size={14} />
-                    <span>Anexar Áudio</span>
-                    <input
-                      type="file"
-                      accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                {isProcessing && (
-                  <div
-                    style={{ color: colors.titleText }}
-                    className="flex items-center justify-center gap-2 pt-2 text-xs font-semibold"
-                  >
-                    <RefreshCw className="animate-spin" size={14} />
-                    <span>{processingStatus}</span>
-                  </div>
                 )}
               </div>
 
-              {/* Seletor de Abas */}
-              <div className="flex border-b border-slate-700/50 pb-2 gap-2">
+              <div className="flex items-center justify-center gap-2.5">
                 <button
-                  onClick={() => setActiveTab('transcribe')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    activeTab === 'transcribe'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/50'
-                  }`}
+                  onClick={handleToggleRecord}
+                  style={{
+                    backgroundColor: isRecording
+                      ? 'rgba(239, 68, 68, 0.2)'
+                      : isDark
+                      ? '#231522'
+                      : '#fef2f2',
+                    color: '#f87171',
+                    borderColor: isDark ? '#451a28' : '#fecaca',
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border shadow-sm cursor-pointer"
                 >
-                  Transcrição
+                  {isRecording ? <Square size={14} /> : <Mic size={14} />}
+                  <span>{isRecording ? 'Parar' : 'Gravar Voz'}</span>
                 </button>
-                <button
-                  onClick={() => setActiveTab('translate')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    activeTab === 'translate'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/50'
-                  }`}
+
+                <label
+                  style={{
+                    backgroundColor: isDark ? '#0f2b3c' : '#f0f9ff',
+                    color: isDark ? '#38bdf8' : '#0284c7',
+                    borderColor: isDark ? '#164e63' : '#bae6fd',
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all hover:opacity-90"
                 >
-                  Tradução
-                </button>
-                <button
-                  onClick={() => setActiveTab('summary')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    activeTab === 'summary'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/50'
-                  }`}
-                >
-                  Resumo
-                </button>
+                  <Upload size={14} />
+                  <span>Anexar Áudio</span>
+                  <input
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
               </div>
 
-              {/* Exibição da Aba Ativa */}
-              {activeTab === 'transcribe' && (
+              {isProcessing && (
                 <div
-                  style={{
-                    backgroundColor: colors.cardBg,
-                    borderColor: colors.cardBorder,
-                  }}
-                  className="border p-4 rounded-2xl shadow-md space-y-3"
+                  style={{ color: colors.titleText }}
+                  className="flex items-center justify-center gap-2 pt-2 text-xs font-semibold"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-cyan-400">
-                      Texto Transcrito
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => speakText(transcription)}
-                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                        title="Ouvir áudio"
-                      >
-                        <Volume2 size={14} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(transcription, 'transcription')
-                        }
-                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                        title="Copiar texto"
-                      >
-                        {copiedSection === 'transcription' ? (
-                          <Check size={14} className="text-emerald-400" />
-                        ) : (
-                          <Copy size={14} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
-                    {transcription}
-                  </p>
+                  <RefreshCw className="animate-spin" size={14} />
+                  <span>{processingStatus}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ABA 1: Transcrição */}
+          {activeTab === 'transcribe' && (
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border p-4 rounded-2xl shadow-md space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-400">
+                  Texto Transcrito
+                </span>
+                <div className="flex gap-2">
                   <button
-                    onClick={handleOpenSaveModal}
-                    className="w-full mt-2 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1.5"
+                    onClick={() => speakText(transcription)}
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    title="Ouvir áudio"
                   >
-                    <Bookmark size={14} /> Salvar Nota
+                    <Volume2 size={14} />
+                  </button>
+                  <button
+                    onClick={() =>
+                      copyToClipboard(transcription, 'transcription')
+                    }
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    title="Copiar texto"
+                  >
+                    {copiedSection === 'transcription' ? (
+                      <Check size={14} className="text-emerald-400" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
                   </button>
                 </div>
-              )}
+              </div>
+              <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
+                {transcription}
+              </p>
+              <button
+                onClick={handleOpenSaveModal}
+                className="w-full mt-2 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1.5"
+              >
+                <Bookmark size={14} /> Salvar Nota
+              </button>
+            </div>
+          )}
 
-              {activeTab === 'translate' && (
-                <div
-                  style={{
-                    backgroundColor: colors.cardBg,
-                    borderColor: colors.cardBorder,
-                  }}
-                  className="border p-4 rounded-2xl shadow-md space-y-3"
+          {/* ABA 2: Tradução */}
+          {activeTab === 'translate' && (
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border p-4 rounded-2xl shadow-md space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-400">
+                  Tradução (EN)
+                </span>
+                <button
+                  onClick={() => copyToClipboard(translation, 'translation')}
+                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-cyan-400">
-                      Tradução (EN)
-                    </span>
-                    <button
-                      onClick={() => copyToClipboard(translation, 'translation')}
-                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                    >
-                      {copiedSection === 'translation' ? (
-                        <Check size={14} className="text-emerald-400" />
-                      ) : (
-                        <Copy size={14} />
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
-                    {translation}
-                  </p>
-                </div>
-              )}
+                  {copiedSection === 'translation' ? (
+                    <Check size={14} className="text-emerald-400" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
+                {translation}
+              </p>
+            </div>
+          )}
 
-              {activeTab === 'summary' && (
-                <div
-                  style={{
-                    backgroundColor: colors.cardBg,
-                    borderColor: colors.cardBorder,
-                  }}
-                  className="border p-4 rounded-2xl shadow-md space-y-3"
+          {/* ABA 3: Resumo */}
+          {activeTab === 'summary' && (
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border p-4 rounded-2xl shadow-md space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-400">
+                  Resumo Executivo
+                </span>
+                <button
+                  onClick={() =>
+                    copyToClipboard(summary?.overview || '', 'summary')
+                  }
+                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-cyan-400">
-                      Resumo Executivo
-                    </span>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(summary?.overview || '', 'summary')
-                      }
-                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                    >
-                      {copiedSection === 'summary' ? (
-                        <Check size={14} className="text-emerald-400" />
-                      ) : (
-                        <Copy size={14} />
-                      )}
-                    </button>
+                  {copiedSection === 'summary' ? (
+                    <Check size={14} className="text-emerald-400" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs leading-relaxed opacity-90">
+                {summary?.overview}
+              </p>
+              <div className="space-y-1 pt-2">
+                <span className="text-[11px] font-bold text-slate-400">
+                  Pontos Chave:
+                </span>
+                {summary?.keyPoints.map((point, index) => (
+                  <div
+                    key={index}
+                    className="text-[11px] flex items-center gap-1.5 opacity-80"
+                  >
+                    <Sparkles size={10} className="text-cyan-400" />
+                    <span>{point}</span>
                   </div>
-                  <p className="text-xs leading-relaxed opacity-90">
-                    {summary?.overview}
-                  </p>
-                  <div className="space-y-1 pt-2">
-                    <span className="text-[11px] font-bold text-slate-400">
-                      Pontos Chave:
-                    </span>
-                    {summary?.keyPoints.map((point, index) => (
-                      <div
-                        key={index}
-                        className="text-[11px] flex items-center gap-1.5 opacity-80"
-                      >
-                        <Sparkles size={10} className="text-cyan-400" />
-                        <span>{point}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            /* Aba de Notas Salvas */
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ABA 4: Notas Salvas */}
+          {activeTab === 'saved' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
@@ -714,7 +675,7 @@ export default function App() {
           )}
         </main>
 
-        {/* Rodapé / Menu Inferior */}
+        {/* Rodapé / Navegação Única */}
         <footer
           style={{
             backgroundColor: colors.headerBg,
@@ -726,49 +687,49 @@ export default function App() {
             onClick={() => setActiveTab('transcribe')}
             className={`flex flex-col items-center gap-1 ${
               activeTab === 'transcribe'
-                ? 'text-cyan-400'
+                ? 'text-cyan-400 font-bold'
                 : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Mic size={18} />
-            <span className="text-[10px] font-semibold">Gravar</span>
+            <span className="text-[10px]">Transcrição</span>
           </button>
           <button
             onClick={() => setActiveTab('translate')}
             className={`flex flex-col items-center gap-1 ${
               activeTab === 'translate'
-                ? 'text-cyan-400'
+                ? 'text-cyan-400 font-bold'
                 : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Globe2 size={18} />
-            <span className="text-[10px] font-semibold">Traduzir</span>
+            <span className="text-[10px]">Tradução</span>
           </button>
           <button
             onClick={() => setActiveTab('summary')}
             className={`flex flex-col items-center gap-1 ${
               activeTab === 'summary'
-                ? 'text-cyan-400'
+                ? 'text-cyan-400 font-bold'
                 : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Sparkles size={18} />
-            <span className="text-[10px] font-semibold">Resumo</span>
+            <span className="text-[10px]">Resumo</span>
           </button>
           <button
             onClick={() => setActiveTab('saved')}
             className={`flex flex-col items-center gap-1 ${
               activeTab === 'saved'
-                ? 'text-cyan-400'
+                ? 'text-cyan-400 font-bold'
                 : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Bookmark size={18} />
-            <span className="text-[10px] font-semibold">Salvos</span>
+            <span className="text-[10px]">Salvos</span>
           </button>
         </footer>
 
-        {/* MODAL DE SALVAR NOTA */}
+        {/* MODAIS */}
         {showSaveModal && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
@@ -809,7 +770,6 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL DE PERFIL / AUTH */}
         {showAuthModal && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
@@ -888,7 +848,6 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL DE PLANOS PRO */}
         {showPlansModal && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
@@ -946,7 +905,6 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL DE CHECKOUT */}
         {showCheckoutModal && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
