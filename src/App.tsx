@@ -26,7 +26,6 @@ import {
   CreditCard,
   QrCode,
   Lock,
-  Play,
 } from 'lucide-react';
 
 interface SavedNote {
@@ -75,9 +74,7 @@ export default function App() {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [hasAudioReady, setHasAudioReady] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [processingStatus, setProcessingStatus] = useState<string>('');
 
   // Título Personalizado
   const [customTitle, setCustomTitle] = useState<string>('');
@@ -144,7 +141,6 @@ export default function App() {
   const handleStopRecordingDueToLimit = () => {
     if (recognitionRef.current) recognitionRef.current.stop();
     setIsRecording(false);
-    setHasAudioReady(true);
     setShowPaywall(true);
   };
 
@@ -152,11 +148,9 @@ export default function App() {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
       setIsRecording(false);
-      setHasAudioReady(true);
     } else {
       setRecordingTime(0);
       setAudioUrl(null);
-      setHasAudioReady(false);
 
       const SpeechRecognition =
         (window as any).SpeechRecognition ||
@@ -186,7 +180,6 @@ export default function App() {
         setIsRecording(true);
         setTimeout(() => {
           setIsRecording(false);
-          setHasAudioReady(true);
           setCustomTitle('Gravação de Voz');
         }, 3000);
       }
@@ -210,7 +203,6 @@ export default function App() {
 
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
-      setHasAudioReady(true);
       setCustomTitle(file.name.replace(/\.[^/.]+$/, ''));
     }
   };
@@ -218,7 +210,6 @@ export default function App() {
   // Função do Botão Gerar
   const handleGenerateContent = () => {
     setIsProcessing(true);
-    setProcessingStatus('A processar áudio com inteligência artificial...');
 
     setTimeout(() => {
       const generatedText =
@@ -233,8 +224,7 @@ export default function App() {
         ],
       });
       setIsProcessing(false);
-      setProcessingStatus('');
-    }, 2000);
+    }, 2500);
   };
 
   const handleOpenSaveModal = () => {
@@ -498,22 +488,17 @@ export default function App() {
                 </label>
               </div>
 
-              {/* BOTÃO GERAR */}
+              {/* BOTÃO GERAR COM PONTINHOS EM MOVIMENTO */}
               <button
                 disabled={isProcessing}
                 onClick={handleGenerateContent}
-                className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1.5 transition-all"
+                className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1 transition-all disabled:opacity-75 cursor-pointer"
               >
-                {isProcessing ? (
-                  <>
-                    <RefreshCw className="animate-spin" size={14} />
-                    <span>{processingStatus}</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={14} />
-                    <span>Gerar Análise (Transcrição, Tradução e Resumo)</span>
-                  </>
+                <span>Gerar</span>
+                {isProcessing && (
+                  <span className="inline-flex tracking-widest font-extrabold text-sm animate-pulse">
+                    ...
+                  </span>
                 )}
               </button>
             </div>
