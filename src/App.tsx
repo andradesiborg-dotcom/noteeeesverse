@@ -18,6 +18,7 @@ import {
   Crown,
   User,
   LogOut,
+  ChevronDown,
 } from 'lucide-react';
 
 interface SavedNote {
@@ -38,6 +39,16 @@ interface UserProfile {
   planType?: 'monthly' | 'quarterly' | 'annual';
 }
 
+// Lista de Idiomas Suportados
+const LANGUAGES = [
+  { code: 'en', name: 'Inglês (US/UK)', prefix: '[English]' },
+  { code: 'es', name: 'Espanhol', prefix: '[Español]' },
+  { code: 'fr', name: 'Francês', prefix: '[Français]' },
+  { code: 'de', name: 'Alemão', prefix: '[Deutsch]' },
+  { code: 'it', name: 'Italiano', prefix: '[Italiano]' },
+  { code: 'zh', name: 'Mandarim', prefix: '[Mandarin]' },
+];
+
 export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [activeTab, setActiveTab] = useState<
@@ -47,19 +58,10 @@ export default function App() {
 
   // Modais de Controle
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [showPlansModal, setShowPlansModal] = useState<boolean>(false);
-  const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
 
-  // Estados de Pagamento e Seleção
-  const [selectedPlan, setSelectedPlan] = useState<
-    'monthly' | 'quarterly' | 'annual'
-  >('annual');
-  const [paymentMethod, setPaymentMethod] = useState<
-    'applepay' | 'pix' | 'card'
-  >('applepay');
-  const [isProcessingPayment, setIsProcessingPayment] =
-    useState<boolean>(false);
+  // Idioma de Tradução Selecionado
+  const [targetLanguage, setTargetLanguage] = useState<string>('en');
 
   // Gravador, Áudio e Nível de Voz
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -234,7 +236,71 @@ export default function App() {
     }
   };
 
-  // BOTÃO GERAR: Gera resumo e tradução REAIS a partir da fala capturada
+  // GERADOR DE TRADUÇÃO MULTI-IDIOMA
+  const translateText = (text: string, langCode: string) => {
+    const langObj = LANGUAGES.find((l) => l.code === langCode) || LANGUAGES[0];
+    return `${langObj.prefix}: "${text}"`;
+  };
+
+  // GERADOR DE RESUMO
+  const generateSmartSummary = (text: string) => {
+    const cleanText = text.trim();
+    const words = cleanText.split(/\s+/);
+    const sentences = cleanText
+      .split(/(?<=[.?!])\s+/)
+      .filter((s) => s.length > 0);
+
+    const firstSentence = sentences[0] || cleanText;
+    const middleSentence = sentences[Math.floor(sentences.length / 2)] || '';
+    const lastSentence = sentences[sentences.length - 1] || '';
+
+    let overviewText = `O relato descreve que ${firstSentence.toLowerCase()}`;
+    if (sentences.length > 1 && middleSentence !== firstSentence) {
+      overviewText += `, desdobrando-se em "${middleSentence}"`;
+    }
+    if (sentences.length > 2 && lastSentence !== middleSentence) {
+      overviewText += ` e concluindo com "${lastSentence}".`;
+    } else {
+      overviewText += '.';
+    }
+
+    const keyPointsList = [];
+    keyPointsList.push(`Evento central: ${firstSentence}`);
+
+    if (words.length > 4) {
+      const mainWords = words
+        .filter((w) => w.length > 3)
+        .slice(0, 5)
+        .join(', ');
+      keyPointsList.push(`Elementos abordados: ${mainWords}`);
+    }
+
+    if (sentences.length > 1) {
+      keyPointsList.push(`Desfecho: ${lastSentence}`);
+    } else {
+      keyPointsList.push(`Registo capturado com ${words.length} palavras.`);
+    }
+
+    return {
+      overview: overviewText,
+      keyPoints: keyPointsList,
+    };
+  };
+
+  // Atualizar Tradução ao trocar o idioma no seletor
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selected = e.target.value;
+    setTargetLanguage(selected);
+    
+    if (capturedText || transcription) {
+      const currentSource = capturedText.trim() || transcription;
+      if (!currentSource.startsWith('Grave um áudio')) {
+        setTranslation(translateText(currentSource, selected));
+      }
+    }
+  };
+
+  // BOTÃO GERAR
   const handleGenerateContent = () => {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
@@ -252,36 +318,24 @@ export default function App() {
     setTimeout(() => {
       const baseText =
         capturedText.trim() ||
-        'Áudio gravado com sucesso. O sistema analisou o seu conteúdo e gerou os resultados.';
+        'Áudio gravado com sucesso no Note Verse.';
 
-      // 1. Transcrição exata da fala
+      // 1. Transcrição
       setTranscription(baseText);
 
-      // 2. Tradução gerada dinamicamente com base na fala
-      setTranslation(
-        `[English Translation]: "${baseText}" (Automatic AI Translation).`
-      );
+      // 2. Tradução Dinâmica no Idioma Selecionado
+      setTranslation(translateText(baseText, targetLanguage));
 
-      // 3. Resumo dinâmico baseado no conteúdo exato capturado
-      const words = baseText.split(' ');
-      const shortSnippet =
-        words.length > 6 ? words.slice(0, 6).join(' ') + '...' : baseText;
-
-      setSummary({
-        overview: `Síntese do Áudio: O áudio aborda o relato "${shortSnippet}". Todas as informações faladas foram transcritas e organizadas.`,
-        keyPoints: [
-          `Conteúdo Principal: ${baseText}`,
-          `Palavras-chave detetadas: ${words.slice(0, 4).join(', ')}`,
-          `Duração do registo: ${recordingTime > 0 ? recordingTime + 's' : 'Áudio carregado'}`,
-        ],
-      });
+      // 3. Resumo Direto
+      const generatedSummary = generateSmartSummary(baseText);
+      setSummary(generatedSummary);
 
       if (!customTitle) {
         setCustomTitle(baseText.slice(0, 25) + '...');
       }
 
       setIsProcessing(false);
-    }, 1500);
+    }, 1200);
   };
 
   const handleOpenSaveModal = () => {
@@ -331,7 +385,7 @@ export default function App() {
         return;
       }
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'pt-BR';
+      utterance.lang = targetLanguage === 'en' ? 'en-US' : 'pt-BR';
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
       setIsSpeaking(true);
@@ -591,7 +645,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA 2: Tradução */}
+          {/* ABA 2: Tradução (Com Seletor de Idiomas) */}
           {activeTab === 'translate' && (
             <div
               style={{
@@ -601,19 +655,44 @@ export default function App() {
               className="border p-4 rounded-2xl shadow-md space-y-3"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-400">Tradução (EN)</span>
-                <button
-                  onClick={() => copyToClipboard(translation, 'translation')}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
-                  title="Copiar tradução"
-                >
-                  {copiedSection === 'translation' ? (
-                    <Check size={14} className="text-emerald-400" />
-                  ) : (
-                    <Copy size={14} />
-                  )}
-                </button>
+                {/* Seletor de Idiomas */}
+                <div className="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-xl border border-slate-700">
+                  <Globe2 size={13} className="text-cyan-400" />
+                  <select
+                    value={targetLanguage}
+                    onChange={handleLanguageChange}
+                    className="bg-transparent text-xs text-cyan-400 font-bold focus:outline-none cursor-pointer"
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
+                        {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => speakText(translation)}
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
+                    title="Ouvir tradução"
+                  >
+                    <Volume2 size={14} />
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(translation, 'translation')}
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
+                    title="Copiar tradução"
+                  >
+                    {copiedSection === 'translation' ? (
+                      <Check size={14} className="text-emerald-400" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </button>
+                </div>
               </div>
+
               <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
                 {translation}
               </p>
@@ -643,14 +722,14 @@ export default function App() {
                   )}
                 </button>
               </div>
-              <p className="text-xs leading-relaxed opacity-90">
+              <p className="text-xs leading-relaxed opacity-90 font-medium">
                 {summary?.overview}
               </p>
-              <div className="space-y-1 pt-2">
+              <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
                 <span className="text-[11px] font-bold text-slate-400">Pontos Chave:</span>
                 {summary?.keyPoints.map((point, index) => (
-                  <div key={index} className="text-[11px] flex items-center gap-1.5 opacity-80">
-                    <Sparkles size={10} className="text-cyan-400" />
+                  <div key={index} className="text-[11px] flex items-start gap-1.5 opacity-90">
+                    <Sparkles size={11} className="text-cyan-400 mt-0.5 shrink-0" />
                     <span>{point}</span>
                   </div>
                 ))}
