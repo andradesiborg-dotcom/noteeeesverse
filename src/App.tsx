@@ -39,7 +39,7 @@ interface UserProfile {
   planType?: 'monthly' | 'quarterly' | 'annual';
 }
 
-// Lista de Idiomas Suportados
+// Lista de Idiomas para a Tradução
 const LANGUAGES = [
   { code: 'en', name: 'Inglês (US/UK)', prefix: '[English]' },
   { code: 'es', name: 'Espanhol', prefix: '[Español]' },
@@ -56,14 +56,14 @@ export default function App() {
   >('transcribe');
   const [user, setUser] = useState<UserProfile | null>(null);
 
-  // Modais de Controle
+  // Modais
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
 
-  // Idioma de Tradução Selecionado
+  // Idioma de Tradução
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
 
-  // Gravador, Áudio e Nível de Voz
+  // Gravador e Nível de Voz
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -71,26 +71,17 @@ export default function App() {
   const [audioLevel, setAudioLevel] = useState<number>(10);
   const [capturedText, setCapturedText] = useState<string>('');
 
-  // Título Personalizado
+  // Título e Conteúdos
   const [customTitle, setCustomTitle] = useState<string>('');
-
-  // Conteúdo das Abas
   const [transcription, setTranscription] = useState<string>(
     'Grave um áudio ou anexe um ficheiro e clique em "Gerar" para ver a transcrição, tradução e resumo.'
   );
   const [translation, setTranslation] = useState<string>(
     'Record an audio or upload a file and click "Generate" to see transcription, translation, and summary.'
   );
-  const [summary, setSummary] = useState<{
-    overview: string;
-    keyPoints: string[];
-  } | null>({
-    overview: 'Resumo executivo do conteúdo Note Verse.',
-    keyPoints: [
-      'Processamento inteligente de áudio',
-      'Resultados instantâneos com IA',
-    ],
-  });
+  const [summary, setSummary] = useState<string>(
+    'Resumo executivo do conteúdo Note Verse.'
+  );
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
 
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
@@ -236,16 +227,15 @@ export default function App() {
     }
   };
 
-  // GERADOR DE TRADUÇÃO MULTI-IDIOMA
+  // TRADUÇÃO MULTI-IDIOMA
   const translateText = (text: string, langCode: string) => {
     const langObj = LANGUAGES.find((l) => l.code === langCode) || LANGUAGES[0];
     return `${langObj.prefix}: "${text}"`;
   };
 
-  // GERADOR DE RESUMO
-  const generateSmartSummary = (text: string) => {
+  // RESUMO DIRETO SEM PALAVRAS-CHAVE
+  const generateCleanSummary = (text: string) => {
     const cleanText = text.trim();
-    const words = cleanText.split(/\s+/);
     const sentences = cleanText
       .split(/(?<=[.?!])\s+/)
       .filter((s) => s.length > 0);
@@ -264,30 +254,10 @@ export default function App() {
       overviewText += '.';
     }
 
-    const keyPointsList = [];
-    keyPointsList.push(`Evento central: ${firstSentence}`);
-
-    if (words.length > 4) {
-      const mainWords = words
-        .filter((w) => w.length > 3)
-        .slice(0, 5)
-        .join(', ');
-      keyPointsList.push(`Elementos abordados: ${mainWords}`);
-    }
-
-    if (sentences.length > 1) {
-      keyPointsList.push(`Desfecho: ${lastSentence}`);
-    } else {
-      keyPointsList.push(`Registo capturado com ${words.length} palavras.`);
-    }
-
-    return {
-      overview: overviewText,
-      keyPoints: keyPointsList,
-    };
+    return overviewText;
   };
 
-  // Atualizar Tradução ao trocar o idioma no seletor
+  // Atualizar Tradução ao Trocar o Idioma
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
     setTargetLanguage(selected);
@@ -323,12 +293,11 @@ export default function App() {
       // 1. Transcrição
       setTranscription(baseText);
 
-      // 2. Tradução Dinâmica no Idioma Selecionado
+      // 2. Tradução Dinâmica no Idioma Escolhido
       setTranslation(translateText(baseText, targetLanguage));
 
-      // 3. Resumo Direto
-      const generatedSummary = generateSmartSummary(baseText);
-      setSummary(generatedSummary);
+      // 3. Resumo Direto e Sem Palavras-Chave
+      setSummary(generateCleanSummary(baseText));
 
       if (!customTitle) {
         setCustomTitle(baseText.slice(0, 25) + '...');
@@ -360,7 +329,7 @@ export default function App() {
       date: formattedDate,
       transcription,
       translation,
-      summaryOverview: summary?.overview || '',
+      summaryOverview: summary,
       durationSeconds: recordingTime,
     };
 
@@ -699,7 +668,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA 3: Resumo */}
+          {/* ABA 3: Resumo Direto (Sem Palavras-Chave) */}
           {activeTab === 'summary' && (
             <div
               style={{
@@ -711,7 +680,7 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-cyan-400">Resumo Executivo</span>
                 <button
-                  onClick={() => copyToClipboard(summary?.overview || '', 'summary')}
+                  onClick={() => copyToClipboard(summary, 'summary')}
                   className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
                   title="Copiar resumo"
                 >
@@ -723,17 +692,8 @@ export default function App() {
                 </button>
               </div>
               <p className="text-xs leading-relaxed opacity-90 font-medium">
-                {summary?.overview}
+                {summary}
               </p>
-              <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
-                <span className="text-[11px] font-bold text-slate-400">Pontos Chave:</span>
-                {summary?.keyPoints.map((point, index) => (
-                  <div key={index} className="text-[11px] flex items-start gap-1.5 opacity-90">
-                    <Sparkles size={11} className="text-cyan-400 mt-0.5 shrink-0" />
-                    <span>{point}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
 
