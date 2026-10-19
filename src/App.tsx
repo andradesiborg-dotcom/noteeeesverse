@@ -25,9 +25,9 @@ interface SavedNote {
   id: string;
   title: string;
   date: string;
-  transcription: string;
-  translation: string;
-  summaryOverview: string;
+  transcription?: string;
+  translation?: string;
+  summaryOverview?: string;
   durationSeconds: number;
 }
 
@@ -39,7 +39,6 @@ interface UserProfile {
   planType?: 'monthly' | 'quarterly' | 'annual';
 }
 
-// Lista de Idiomas para a Tradução
 const LANGUAGES = [
   { code: 'pt', name: 'Português (PT/BR)' },
   { code: 'en', name: 'Inglês (US/UK)' },
@@ -61,7 +60,18 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
 
-  // Idioma de Tradução Selecionado (Deteção Automática do Dispositivo)
+  // Seleção de itens a guardar na Nota
+  const [saveOptions, setSaveOptions] = useState<{
+    transcription: boolean;
+    translation: boolean;
+    summary: boolean;
+  }>({
+    transcription: true,
+    translation: true,
+    summary: true,
+  });
+
+  // Idioma de Tradução Selecionado
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
 
   // Gravador e Nível de Voz
@@ -95,7 +105,7 @@ export default function App() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // DETEÇÃO AUTOMÁTICA DO IDIOMA DO DISPOSITIVO
+  // Deteção do idioma do aparelho
   useEffect(() => {
     const deviceLang = navigator.language || (navigator as any).userLanguage || 'pt';
     const langCode = deviceLang.split('-')[0].toLowerCase();
@@ -240,7 +250,7 @@ export default function App() {
     }
   };
 
-  // TRADUÇÃO REAL VIA API GRATUITA DO GOOGLE TRANSLATE
+  // Tradução Real via Google Translate
   const translateTextReal = async (text: string, targetLang: string) => {
     if (!text || text.startsWith('Grave um áudio')) return text;
     setIsTranslating(true);
@@ -263,7 +273,7 @@ export default function App() {
     return text;
   };
 
-  // RESUMO DIRETO SEM PALAVRAS-CHAVE
+  // Resumo Direto
   const generateCleanSummary = (text: string) => {
     const cleanText = text.trim();
     const sentences = cleanText
@@ -287,7 +297,6 @@ export default function App() {
     return overviewText;
   };
 
-  // Trocar o idioma na aba de Tradução (Traduz em tempo real)
   const handleLanguageChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
     setTargetLanguage(selected);
@@ -299,7 +308,7 @@ export default function App() {
     }
   };
 
-  // BOTÃO GERAR
+  // Botão Gerar
   const handleGenerateContent = async () => {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
@@ -316,17 +325,13 @@ export default function App() {
 
     const baseText = capturedText.trim() || 'Áudio gravado com sucesso no Note Verse.';
 
-    // 1. Transcrição
     setTranscription(baseText);
-
-    // 2. Resumo Direto
     setSummary(generateCleanSummary(baseText));
 
     if (!customTitle) {
       setCustomTitle(baseText.slice(0, 25) + '...');
     }
 
-    // 3. Tradução Real para o Idioma Selecionado
     const translatedText = await translateTextReal(baseText, targetLanguage);
     setTranslation(translatedText);
 
@@ -340,6 +345,11 @@ export default function App() {
   };
 
   const handleConfirmSaveNote = () => {
+    if (!saveOptions.transcription && !saveOptions.translation && !saveOptions.summary) {
+      alert('Selecione pelo menos um item para salvar!');
+      return;
+    }
+
     const now = new Date();
     const formattedDate = `${now.toLocaleDateString(
       'pt-PT'
@@ -353,9 +363,9 @@ export default function App() {
       id: Date.now().toString(),
       title: customTitle || 'Documento sem título',
       date: formattedDate,
-      transcription,
-      translation,
-      summaryOverview: summary,
+      transcription: saveOptions.transcription ? transcription : undefined,
+      translation: saveOptions.translation ? translation : undefined,
+      summaryOverview: saveOptions.summary ? summary : undefined,
       durationSeconds: recordingTime,
     };
 
@@ -640,7 +650,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA 2: Tradução (Com Tradução Real) */}
+          {/* ABA 2: Tradução */}
           {activeTab === 'translate' && (
             <div
               style={{
@@ -650,7 +660,6 @@ export default function App() {
               className="border p-4 rounded-2xl shadow-md space-y-3"
             >
               <div className="flex items-center justify-between">
-                {/* Seletor de Idiomas */}
                 <div className="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-xl border border-slate-700">
                   <Globe2 size={13} className="text-cyan-400" />
                   <select
@@ -697,6 +706,13 @@ export default function App() {
                   {translation}
                 </p>
               )}
+              <button
+                disabled={translation.startsWith('Record an audio')}
+                onClick={handleOpenSaveModal}
+                className="w-full mt-2 py-2 bg-slate-800 text-cyan-400 font-bold text-xs rounded-xl border border-cyan-500/30 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Bookmark size={14} /> Salvar Nota
+              </button>
             </div>
           )}
 
@@ -726,6 +742,13 @@ export default function App() {
               <p className="text-xs leading-relaxed opacity-90 font-medium">
                 {summary}
               </p>
+              <button
+                disabled={summary.startsWith('Resumo executivo')}
+                onClick={handleOpenSaveModal}
+                className="w-full mt-2 py-2 bg-slate-800 text-cyan-400 font-bold text-xs rounded-xl border border-cyan-500/30 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Bookmark size={14} /> Salvar Nota
+              </button>
             </div>
           )}
 
@@ -749,10 +772,10 @@ export default function App() {
                       backgroundColor: colors.cardBg,
                       borderColor: colors.cardBorder,
                     }}
-                    className="border p-3 rounded-2xl shadow-sm space-y-2"
+                    className="border p-3.5 rounded-2xl shadow-sm space-y-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold">{note.title}</span>
+                      <span className="text-xs font-bold text-cyan-400">{note.title}</span>
                       <button
                         onClick={() => handleDeleteNote(note.id)}
                         className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
@@ -760,8 +783,29 @@ export default function App() {
                         <Trash2 size={14} />
                       </button>
                     </div>
-                    <p className="text-[11px] opacity-80 line-clamp-2">{note.transcription}</p>
-                    <div className="text-[10px] text-slate-500 flex justify-between">
+
+                    {note.transcription && (
+                      <div className="bg-slate-900/50 p-2 rounded-xl space-y-0.5 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 font-bold">Transcrição:</span>
+                        <p className="text-[11px] opacity-80 line-clamp-2">{note.transcription}</p>
+                      </div>
+                    )}
+
+                    {note.translation && (
+                      <div className="bg-slate-900/50 p-2 rounded-xl space-y-0.5 border border-slate-800">
+                        <span className="text-[10px] text-cyan-400 font-bold">Tradução:</span>
+                        <p className="text-[11px] opacity-80 line-clamp-2">{note.translation}</p>
+                      </div>
+                    )}
+
+                    {note.summaryOverview && (
+                      <div className="bg-slate-900/50 p-2 rounded-xl space-y-0.5 border border-slate-800">
+                        <span className="text-[10px] text-emerald-400 font-bold">Resumo:</span>
+                        <p className="text-[11px] opacity-80 line-clamp-2">{note.summaryOverview}</p>
+                      </div>
+                    )}
+
+                    <div className="text-[10px] text-slate-500 pt-1 flex justify-between">
                       <span>{note.date}</span>
                     </div>
                   </div>
@@ -825,7 +869,7 @@ export default function App() {
           </button>
         </footer>
 
-        {/* MODAL SALVAR NOTA */}
+        {/* MODAL SALVAR NOTA COM SELEÇÃO DE CONTEÚDO */}
         {showSaveModal && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
@@ -836,6 +880,7 @@ export default function App() {
               className="border w-full max-w-xs p-5 rounded-2xl shadow-2xl space-y-4"
             >
               <h3 className="text-sm font-bold text-cyan-400">Salvar Nota</h3>
+              
               <div className="space-y-1">
                 <label className="text-[11px] text-slate-400">Título da Nota</label>
                 <input
@@ -846,6 +891,47 @@ export default function App() {
                   placeholder="Digite um título..."
                 />
               </div>
+
+              <div className="space-y-2 pt-1">
+                <label className="text-[11px] text-slate-400 font-bold">O que deseja incluir nesta nota?</label>
+                
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveOptions.transcription}
+                    onChange={(e) =>
+                      setSaveOptions({ ...saveOptions, transcription: e.target.checked })
+                    }
+                    className="accent-cyan-400 rounded cursor-pointer"
+                  />
+                  <span>Transcrição Completa</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveOptions.translation}
+                    onChange={(e) =>
+                      setSaveOptions({ ...saveOptions, translation: e.target.checked })
+                    }
+                    className="accent-cyan-400 rounded cursor-pointer"
+                  />
+                  <span>Texto Traduzido</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveOptions.summary}
+                    onChange={(e) =>
+                      setSaveOptions({ ...saveOptions, summary: e.target.checked })
+                    }
+                    className="accent-cyan-400 rounded cursor-pointer"
+                  />
+                  <span>Resumo Executivo</span>
+                </label>
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setShowSaveModal(false)}
