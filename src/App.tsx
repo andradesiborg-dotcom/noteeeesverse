@@ -207,8 +207,13 @@ export default function App() {
     }
   };
 
-  // Função do Botão Gerar
+  // Botão Gerar: Se estiver a gravar, para automaticamente e gera o conteúdo
   const handleGenerateContent = () => {
+    if (isRecording) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+
     setIsProcessing(true);
 
     setTimeout(() => {
@@ -451,42 +456,60 @@ export default function App() {
                 )}
               </div>
 
-              <div className="flex items-center justify-center gap-2.5">
+              {/* INDICADOR DE MOVIMENTO DE FALA (ONDAS SONORAS) */}
+              {isRecording ? (
+                <div className="flex items-center justify-center gap-1 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                  <span className="text-xs text-red-400 font-bold mr-2">A gravar voz...</span>
+                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-4" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-6" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-3" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-7" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-1 bg-red-400 rounded-full animate-bounce h-5" style={{ animationDelay: '0.3s' }}></div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2.5">
+                  <button
+                    onClick={handleToggleRecord}
+                    style={{
+                      backgroundColor: isDark ? '#231522' : '#fef2f2',
+                      color: '#f87171',
+                      borderColor: isDark ? '#451a28' : '#fecaca',
+                    }}
+                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border shadow-sm cursor-pointer"
+                  >
+                    <Mic size={14} />
+                    <span>Gravar Voz</span>
+                  </button>
+
+                  <label
+                    style={{
+                      backgroundColor: isDark ? '#0f2b3c' : '#f0f9ff',
+                      color: isDark ? '#38bdf8' : '#0284c7',
+                      borderColor: isDark ? '#164e63' : '#bae6fd',
+                    }}
+                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all hover:opacity-90"
+                  >
+                    <Upload size={14} />
+                    <span>Anexar Áudio</span>
+                    <input
+                      type="file"
+                      accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* Se estiver a gravar, mostra também o botão de parar separado opcionalmente, ou foca no Gerar */}
+              {isRecording && (
                 <button
                   onClick={handleToggleRecord}
-                  style={{
-                    backgroundColor: isRecording
-                      ? 'rgba(239, 68, 68, 0.2)'
-                      : isDark
-                      ? '#231522'
-                      : '#fef2f2',
-                    color: '#f87171',
-                    borderColor: isDark ? '#451a28' : '#fecaca',
-                  }}
-                  className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border shadow-sm cursor-pointer"
+                  className="w-full py-1.5 bg-red-500/20 text-red-400 text-xs font-bold rounded-xl border border-red-500/30 hover:bg-red-500/30"
                 >
-                  {isRecording ? <Square size={14} /> : <Mic size={14} />}
-                  <span>{isRecording ? 'Parar' : 'Gravar Voz'}</span>
+                  Parar Gravação Manualmente
                 </button>
-
-                <label
-                  style={{
-                    backgroundColor: isDark ? '#0f2b3c' : '#f0f9ff',
-                    color: isDark ? '#38bdf8' : '#0284c7',
-                    borderColor: isDark ? '#164e63' : '#bae6fd',
-                  }}
-                  className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all hover:opacity-90"
-                >
-                  <Upload size={14} />
-                  <span>Anexar Áudio</span>
-                  <input
-                    type="file"
-                    accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-              </div>
+              )}
 
               {/* BOTÃO GERAR COM PONTINHOS EM MOVIMENTO */}
               <button
