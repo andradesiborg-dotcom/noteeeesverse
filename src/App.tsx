@@ -39,8 +39,9 @@ interface UserProfile {
   planType?: 'monthly' | 'quarterly' | 'annual';
 }
 
-// Lista de Idiomas para a Tradução
+// Lista de Idiomas e Mapeamento Nativo
 const LANGUAGES = [
+  { code: 'pt', name: 'Português (PT/BR)', prefix: '[Português]' },
   { code: 'en', name: 'Inglês (US/UK)', prefix: '[English]' },
   { code: 'es', name: 'Espanhol', prefix: '[Español]' },
   { code: 'fr', name: 'Francês', prefix: '[Français]' },
@@ -60,7 +61,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
 
-  // Idioma de Tradução Selecionado
+  // Idioma de Tradução Selecionado (Deteção Automática do Dispositivo)
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
 
   // Gravador e Nível de Voz
@@ -93,7 +94,19 @@ export default function App() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
+  // DETEÇÃO AUTOMÁTICA DO IDIOMA DO DISPOSITIVO DO UTILIZADOR
   useEffect(() => {
+    const deviceLang = navigator.language || (navigator as any).userLanguage || 'pt';
+    const langCode = deviceLang.split('-')[0].toLowerCase();
+
+    // Se o idioma do telemóvel existir na lista, define-o automaticamente
+    const matchedLang = LANGUAGES.find((l) => l.code === langCode);
+    if (matchedLang) {
+      setTargetLanguage(matchedLang.code);
+    } else {
+      setTargetLanguage('en');
+    }
+
     const localData = localStorage.getItem('noteverse_saved');
     if (localData) {
       try {
@@ -187,7 +200,9 @@ export default function App() {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = 'pt-BR';
+        
+        // Deteta o idioma de entrada do microfone do telemóvel do utilizador
+        recognition.lang = navigator.language || 'pt-BR';
 
         recognition.onresult = (event: any) => {
           let currentText = '';
@@ -223,7 +238,7 @@ export default function App() {
       setCapturedText('');
       setAudioUrl(url);
       setCustomTitle(file.name.replace(/\.[^/.]+$/, ''));
-      setTranscription(`Arquivo "${file.name}" carregado. Clique em "Gerar" para processar.`);
+      setTranscription(`Ficheiro "${file.name}" carregado. Clique em "Gerar" para processar.`);
     }
   };
 
@@ -257,7 +272,7 @@ export default function App() {
     return overviewText;
   };
 
-  // Trocar o idioma na aba de Tradução
+  // Trocar o idioma manualmente na aba de Tradução
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
     setTargetLanguage(selected);
@@ -279,7 +294,7 @@ export default function App() {
     }
 
     if (!audioUrl && !capturedText) {
-      alert('Grave um áudio ou anexe um arquivo antes de gerar.');
+      alert('Grave um áudio ou anexe um ficheiro antes de gerar.');
       return;
     }
 
@@ -293,10 +308,10 @@ export default function App() {
       // 1. Transcrição
       setTranscription(baseText);
 
-      // 2. Tradução Dinâmica no Idioma Escolhido
+      // 2. Tradução Dinâmica no Idioma Selecionado ou Detetado do Aparelho
       setTranslation(translateText(baseText, targetLanguage));
 
-      // 3. Resumo Direto sem Palavras-Chave
+      // 3. Resumo Direto
       setSummary(generateCleanSummary(baseText));
 
       if (!customTitle) {
@@ -354,7 +369,7 @@ export default function App() {
         return;
       }
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = targetLanguage === 'en' ? 'en-US' : 'pt-BR';
+      utterance.lang = navigator.language || 'pt-BR';
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
       setIsSpeaking(true);
@@ -668,7 +683,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA 3: Resumo Direto (Sem Palavras-Chave) */}
+          {/* ABA 3: Resumo Direto */}
           {activeTab === 'summary' && (
             <div
               style={{
