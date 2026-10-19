@@ -26,6 +26,7 @@ import {
   CreditCard,
   QrCode,
   Lock,
+  Play,
 } from 'lucide-react';
 
 interface SavedNote {
@@ -67,7 +68,6 @@ export default function App() {
   const [paymentMethod, setPaymentMethod] = useState<
     'applepay' | 'pix' | 'card'
   >('applepay');
-  const [pixCopied, setPixCopied] = useState<boolean>(false);
   const [isProcessingPayment, setIsProcessingPayment] =
     useState<boolean>(false);
 
@@ -75,6 +75,7 @@ export default function App() {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [hasAudioReady, setHasAudioReady] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStatus, setProcessingStatus] = useState<string>('');
 
@@ -83,10 +84,10 @@ export default function App() {
 
   // Conteúdo das Abas
   const [transcription, setTranscription] = useState<string>(
-    'Esta é uma nota de exemplo. Grave a sua voz ou anexe um áudio para gerar transcrição, tradução e resumo.'
+    'Grave um áudio ou anexe um ficheiro e clique em "Gerar" para ver a transcrição, tradução e resumo.'
   );
   const [translation, setTranslation] = useState<string>(
-    'This is an example note. Record your voice or upload an audio to generate transcription, translation, and summary.'
+    'Record an audio or upload a file and click "Generate" to see transcription, translation, and summary.'
   );
   const [summary, setSummary] = useState<{
     overview: string;
@@ -94,8 +95,8 @@ export default function App() {
   } | null>({
     overview: 'Resumo executivo do conteúdo Note Verse.',
     keyPoints: [
-      'Processamento 100% no dispositivo',
-      'Suporte a salvamento com título e data exata',
+      'Processamento inteligente de áudio',
+      'Resultados instantâneos com IA',
     ],
   });
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
@@ -143,6 +144,7 @@ export default function App() {
   const handleStopRecordingDueToLimit = () => {
     if (recognitionRef.current) recognitionRef.current.stop();
     setIsRecording(false);
+    setHasAudioReady(true);
     setShowPaywall(true);
   };
 
@@ -150,9 +152,11 @@ export default function App() {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
       setIsRecording(false);
+      setHasAudioReady(true);
     } else {
       setRecordingTime(0);
       setAudioUrl(null);
+      setHasAudioReady(false);
 
       const SpeechRecognition =
         (window as any).SpeechRecognition ||
@@ -170,11 +174,7 @@ export default function App() {
           }
           if (currentText.trim()) {
             setTranscription(currentText.trim());
-            setTranslation(`[Tradução Automática]: ${currentText.trim()}`);
-            setSummary({
-              overview: 'Síntese automática do áudio gravado.',
-              keyPoints: ['Conteúdo capturado e processado localmente.'],
-            });
+            setTranslation(`[Tradução]: ${currentText.trim()}`);
             setCustomTitle(currentText.trim().slice(0, 30) + '...');
           }
         };
@@ -185,16 +185,9 @@ export default function App() {
       } else {
         setIsRecording(true);
         setTimeout(() => {
-          const mockText =
-            'Gravação de voz efetuada com sucesso no Note Verse.';
-          setTranscription(mockText);
-          setTranslation(`[Tradução Automática]: ${mockText}`);
-          setSummary({
-            overview: 'Resumo executivo gerado.',
-            keyPoints: ['Áudio de voz registado.'],
-          });
-          setCustomTitle('Gravação de Voz');
           setIsRecording(false);
+          setHasAudioReady(true);
+          setCustomTitle('Gravação de Voz');
         }, 3000);
       }
     }
@@ -217,21 +210,31 @@ export default function App() {
 
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
-      setIsProcessing(true);
-      setProcessingStatus('A processar ficheiro de áudio...');
-
-      setTimeout(() => {
-        const fileText = `Ficheiro de áudio "${file.name}" processado com sucesso. Note Verse pronto.`;
-        setTranscription(fileText);
-        setTranslation(`[Tradução Automática]: ${fileText}`);
-        setSummary({
-          overview: `Resumo do áudio: ${file.name}`,
-          keyPoints: ['Áudio importado externamente e validado'],
-        });
-        setCustomTitle(file.name.replace(/\.[^/.]+$/, ''));
-        setIsProcessing(false);
-      }, 1500);
+      setHasAudioReady(true);
+      setCustomTitle(file.name.replace(/\.[^/.]+$/, ''));
     }
+  };
+
+  // Função do Botão Gerar
+  const handleGenerateContent = () => {
+    setIsProcessing(true);
+    setProcessingStatus('A processar áudio com inteligência artificial...');
+
+    setTimeout(() => {
+      const generatedText =
+        'Nota gerada com sucesso! O sistema processou o seu áudio e estruturou todas as informações detalhadas.';
+      setTranscription(generatedText);
+      setTranslation(`[English Translation]: Successfully generated note based on audio input.`);
+      setSummary({
+        overview: 'Resumo executivo gerado automaticamente a partir do áudio.',
+        keyPoints: [
+          'Áudio processado e validado com sucesso',
+          'Tradução e sumário estruturados em tempo real',
+        ],
+      });
+      setIsProcessing(false);
+      setProcessingStatus('');
+    }, 2000);
   };
 
   const handleOpenSaveModal = () => {
@@ -435,7 +438,7 @@ export default function App() {
           style={{ backgroundColor: colors.bgFrame }}
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
         >
-          {/* Estúdio de Entrada (Exibido em todas as abas exceto 'saved') */}
+          {/* Estúdio de Entrada */}
           {activeTab !== 'saved' && (
             <div
               style={{
@@ -495,15 +498,24 @@ export default function App() {
                 </label>
               </div>
 
-              {isProcessing && (
-                <div
-                  style={{ color: colors.titleText }}
-                  className="flex items-center justify-center gap-2 pt-2 text-xs font-semibold"
-                >
-                  <RefreshCw className="animate-spin" size={14} />
-                  <span>{processingStatus}</span>
-                </div>
-              )}
+              {/* BOTÃO GERAR */}
+              <button
+                disabled={isProcessing}
+                onClick={handleGenerateContent}
+                className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1.5 transition-all"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="animate-spin" size={14} />
+                    <span>{processingStatus}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    <span>Gerar Análise (Transcrição, Tradução e Resumo)</span>
+                  </>
+                )}
+              </button>
             </div>
           )}
 
@@ -548,7 +560,7 @@ export default function App() {
               </p>
               <button
                 onClick={handleOpenSaveModal}
-                className="w-full mt-2 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1.5"
+                className="w-full mt-2 py-2 bg-slate-800 text-cyan-400 font-bold text-xs rounded-xl border border-cyan-500/30 hover:bg-slate-700 flex items-center justify-center gap-1.5"
               >
                 <Bookmark size={14} /> Salvar Nota
               </button>
@@ -822,7 +834,7 @@ export default function App() {
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-slate-400 text-center">
-                    Inicie sessão para sincronizar suas notas e acessar recursos avançados.
+                    Inicie sessão para sincronizar suas notas e aceder a recursos avançados.
                   </p>
                   <button
                     onClick={() => {
