@@ -60,7 +60,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
 
-  // Idioma de Tradução
+  // Idioma de Tradução Selecionado
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
 
   // Gravador e Nível de Voz
@@ -257,7 +257,7 @@ export default function App() {
     return overviewText;
   };
 
-  // Atualizar Tradução ao Trocar o Idioma
+  // Trocar o idioma na aba de Tradução
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
     setTargetLanguage(selected);
@@ -296,7 +296,7 @@ export default function App() {
       // 2. Tradução Dinâmica no Idioma Escolhido
       setTranslation(translateText(baseText, targetLanguage));
 
-      // 3. Resumo Direto e Sem Palavras-Chave
+      // 3. Resumo Direto sem Palavras-Chave
       setSummary(generateCleanSummary(baseText));
 
       if (!customTitle) {
