@@ -511,4 +511,15 @@ export default function App() {
                     style={{ color: colors.titleText }}
                     className="flex items-center justify-center gap-2 pt-2 text-xs font-semibold"
                   >
-                    <RefreshCw className="animate-spin" size={14
+                    <RefreshCw className="animate-spin" size={14} />
+                    <span>{processingStatus}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : null}
+        </main>
+      </div>
+    </div>
+  );
+}
