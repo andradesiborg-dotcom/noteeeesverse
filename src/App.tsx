@@ -45,29 +45,37 @@ export default function App() {
   >('transcribe');
   const [user, setUser] = useState<UserProfile | null>(null);
 
-  // Modais
+  // Modais de Controle
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showPlansModal, setShowPlansModal] = useState<boolean>(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
+  const [showPaywall, setShowPaywall] = useState<boolean>(false);
 
-  // Estados de Pagamento
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual');
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
-  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  // Estados de Pagamento e Seleção
+  const [selectedPlan, setSelectedPlan] = useState<
+    'monthly' | 'quarterly' | 'annual'
+  >('annual');
+  const [paymentMethod, setPaymentMethod] = useState<
+    'applepay' | 'pix' | 'card'
+  >('applepay');
+  const [isProcessingPayment, setIsProcessingPayment] =
+    useState<boolean>(false);
 
   // Gravador, Áudio e Nível de Voz
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [audioLevel, setAudioLevel] = useState<number>(15);
+  const [audioLevel, setAudioLevel] = useState<number>(10); // Nível do volume da voz (0 a 100)
+  const [capturedText, setCapturedText] = useState<string>(''); // Texto capturado em tempo real
 
-  // Título e Conteúdo
+  // Título Personalizado
   const [customTitle, setCustomTitle] = useState<string>('');
-  const [capturedText, setCapturedText] = useState<string>('');
 
+  // Conteúdo das Abas
   const [transcription, setTranscription] = useState<string>(
-    'Grave um áudio ou anexe um arquivo e clique em "Gerar" para ver a transcrição, tradução e resumo.'
+    'Grave um áudio ou anexe um ficheiro e clique em "Gerar" para ver a transcrição, tradução e resumo.'
   );
   const [translation, setTranslation] = useState<string>(
     'Record an audio or upload a file and click "Generate" to see transcription, translation, and summary.'
@@ -77,10 +85,13 @@ export default function App() {
     keyPoints: string[];
   } | null>({
     overview: 'Resumo executivo do conteúdo Note Verse.',
-    keyPoints: ['Processamento de áudio inteligente', 'Resultados em tempo real'],
+    keyPoints: [
+      'Processamento inteligente de áudio',
+      'Resultados instantâneos com IA',
+    ],
   });
-
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
+
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
 
@@ -90,7 +101,6 @@ export default function App() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // Carregar dados salvos
   useEffect(() => {
     const localData = localStorage.getItem('noteverse_saved');
     if (localData) {
@@ -107,17 +117,23 @@ export default function App() {
     }
   }, []);
 
-  // Timer da gravação
+  // Timer de Gravação
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
+        setRecordingTime((prev) => {
+          if (!user?.isPro && prev >= 60) {
+            handleStopRecordingDueToLimit();
+            return 60;
+          }
+          return prev + 1;
+        });
       }, 1000);
     } else {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [isRecording]);
+  }, [isRecording, user]);
 
   const stopAudioAnalysis = () => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -136,7 +152,8 @@ export default function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioContextClass();
       audioContextRef.current = audioCtx;
 
@@ -154,542 +171,125 @@ export default function App() {
           sum += dataArray[i];
         }
         const average = sum / dataArray.length;
-        setAudioLevel(Math.max(15, Math.min(100, average * 1.8)));
+        // Normaliza o nível entre 15 e 100
+        setAudioLevel(Math.max(15, Math.min(100, average * 1.5)));
         animFrameRef.current = requestAnimationFrame(updateLevel);
       };
 
       updateLevel();
     } catch (e) {
-      console.warn('Microfone não acessível para animação gráfica.', e);
+      console.warn('Não foi possível acessar o microfone para o visualizador de voz.', e);
     }
+  };
+
+  const handleStopRecordingDueToLimit = () => {
+    if (recognitionRef.current) recognitionRef.current.stop();
+    stopAudioAnalysis();
+    setIsRecording(false);
+    setShowPaywall(true);
   };
 
   const handleToggleRecord = () => {
     if (isRecording) {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
+      // Pausar
+      if (recognitionRef.current) recognitionRef.current.stop();
       stopAudioAnalysis();
       setIsRecording(false);
+      // CORREÇÃO: Não limpamos capturedText ou audioUrl ao pausar,
+      // para que eles permaneçam disponíveis para geração.
     } else {
+      // Começar nova gravação
+      // CORREÇÃO: Limpamos apenas quando clicamos em "Gravar Voz" novamente.
+      if (capturedText || audioUrl) {
+          setAudioUrl(null);
+          setCapturedText('');
+          setTranscription('Grave um áudio ou anexe um ficheiro e clique em "Gerar" para ver a transcrição, tradução e resumo.'); // Reseta o texto exibido
+          setTranslation('Record an audio or upload a file and click "Generate" to see transcription, translation, and summary.');
+          setSummary({overview: 'Resumo executivo do conteúdo Note Verse.', keyPoints: ['Processamento inteligente de áudio', 'Resultados instantâneos com IA']});
+          setCustomTitle('');
+      }
       setRecordingTime(0);
-      setCapturedText('');
       startAudioAnalysis();
 
       const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
-        try {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = 'pt-BR';
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'pt-BR';
 
-          recognition.onresult = (event: any) => {
-            let currentText = '';
-            for (let i = 0; i < event.results.length; i++) {
-              currentText += event.results[i][0].transcript + ' ';
-            }
-            if (currentText.trim()) {
-              setCapturedText(currentText.trim());
-            }
-          };
+        recognition.onresult = (event: any) => {
+          let currentText = '';
+          for (let i = 0; i < event.results.length; i++) {
+            currentText += event.results[i][0].transcript + ' ';
+          }
+          if (currentText.trim()) {
+            setCapturedText(currentText.trim());
+          }
+        };
 
-          recognitionRef.current = recognition;
-          recognition.start();
-        } catch (e) {
-          console.warn('SpeechRecognition indisponível no navegador.', e);
-        }
+        recognitionRef.current = recognition;
+        recognition.start();
+        setIsRecording(true);
+      } else {
+        // Fallback para quando o navegador não suporta reconhecimento nativo
+        setIsRecording(true);
+        // Simulação básica para não-suportados
+        setTimeout(() => {
+          setCapturedText('Esta é uma gravação simulada do Note Verse...');
+          setCustomTitle('Gravação Simulada');
+        }, 1000);
       }
-      setIsRecording(true);
     }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setCapturedText(`Áudio importado do arquivo: ${file.name}`);
+      const isAudioType = file.type.startsWith('audio/');
+      const hasAudioExtension = /\.(mp3|wav|m4a|aac|ogg|flac|webm)$/i.test(
+        file.name
+      );
+
+      if (!isAudioType && !hasAudioExtension) {
+        alert(
+          'Por favor, selecione apenas ficheiros de áudio válidos (MP3, WAV, M4A, etc.).'
+        );
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      // CORREÇÃO: Limpamos capturedText anterior para que o arquivo tenha prioridade
+      if (isRecording) {
+          if (recognitionRef.current) recognitionRef.current.stop();
+          stopAudioAnalysis();
+          setIsRecording(false);
+      }
+      setCapturedText('');
+      setAudioUrl(url);
       setCustomTitle(file.name.replace(/\.[^/.]+$/, ''));
-      alert(`Arquivo "${file.name}" carregado. Clique em "Gerar" para analisar.`);
+      setTranscription(`Arquivo de áudio "${file.name}" anexado. Clique em "Gerar" para analisar.`);
     }
   };
 
-  // GERAR CONTEÚDO
+  // Botão Gerar: Para a gravação se estiver ativa e processa o áudio capturado
   const handleGenerateContent = () => {
     if (isRecording) {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
+      if (recognitionRef.current) recognitionRef.current.stop();
       stopAudioAnalysis();
       setIsRecording(false);
+    }
+
+    if (!audioUrl && !capturedText) {
+        alert('Grave um áudio ou anexe um arquivo antes de gerar.');
+        return;
     }
 
     setIsProcessing(true);
 
     setTimeout(() => {
+      // CORREÇÃO: Priorizamos capturedText (gravação) sobre áudio anexado
       const finalText =
-        capturedText.trim() ||
-        'Áudio gravado com sucesso! A fala foi capturada e estruturada com precisão pelo Note Verse.';
-
-      setTranscription(finalText);
-      setTranslation(`[English Translation]: ${finalText}`);
-      setSummary({
-        overview: 'Resumo executivo gerado a partir do áudio gravado.',
-        keyPoints: [
-          'Áudio capturado e processado',
-          'Transcrição e tradução geradas instantaneamente',
-        ],
-      });
-
-      if (!customTitle) {
-        setCustomTitle(finalText.slice(0, 25) + '...');
-      }
-
-      setIsProcessing(false);
-    }, 1500);
-  };
-
-  // SALVAR NOTA
-  const handleConfirmSaveNote = () => {
-    const now = new Date();
-    const formattedDate = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })}`;
-
-    const newNote: SavedNote = {
-      id: Date.now().toString(),
-      title: customTitle || 'Nota sem título',
-      date: formattedDate,
-      transcription,
-      translation,
-      summaryOverview: summary?.overview || '',
-      durationSeconds: recordingTime,
-    };
-
-    const updated = [newNote, ...savedNotes];
-    setSavedNotes(updated);
-    localStorage.setItem('noteverse_saved', JSON.stringify(updated));
-    setShowSaveModal(false);
-    setActiveTab('saved');
-  };
-
-  const handleDeleteNote = (id: string) => {
-    const updated = savedNotes.filter((n) => n.id !== id);
-    setSavedNotes(updated);
-    localStorage.setItem('noteverse_saved', JSON.stringify(updated));
-  };
-
-  const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      if (isSpeaking) {
-        window.speechSynthesis.cancel();
-        setIsSpeaking(false);
-        return;
-      }
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'pt-BR';
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  const copyToClipboard = (text: string, section: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedSection(section);
-    setTimeout(() => setCopiedSection(null), 2000);
-  };
-
-  const isDark = theme === 'dark';
-  const colors = {
-    bgApp: isDark ? '#050914' : '#e2e8f0',
-    bgFrame: isDark ? '#0b1325' : '#ffffff',
-    borderFrame: isDark ? '#1e293b' : '#cbd5e1',
-    headerBg: isDark ? '#0b1325' : '#ffffff',
-    borderHeader: isDark ? '#1a243a' : '#f1f5f9',
-    titleText: isDark ? '#38bdf8' : '#0f172a',
-    cardBg: isDark ? '#111a2e' : '#f8fafc',
-    cardBorder: isDark ? '#1e2d4a' : '#e2e8f0',
-    mainText: isDark ? '#e2e8f0' : '#0f172a',
-  };
-
-  return (
-    <div
-      style={{ backgroundColor: colors.bgApp, color: colors.mainText }}
-      className="min-h-screen flex items-center justify-center p-0 sm:p-4 font-sans transition-colors duration-300"
-    >
-      <div
-        style={{
-          backgroundColor: colors.bgFrame,
-          borderColor: colors.borderFrame,
-        }}
-        className="w-full sm:max-w-[400px] h-screen sm:h-[840px] sm:rounded-[48px] sm:border-[8px] shadow-2xl flex flex-col justify-between relative overflow-hidden"
-      >
-        {/* Dynamic Island */}
-        <div
-          style={{ backgroundColor: '#000000' }}
-          className="hidden sm:flex absolute top-0 left-1/2 transform -translate-x-1/2 w-36 h-6 rounded-b-2xl items-center justify-between px-3 z-50"
-        >
-          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-          <span className="text-[10px] text-slate-300 font-semibold">Note Verse</span>
-          <ShieldCheck size={12} className="text-emerald-400" />
-        </div>
-
-        {/* Cabeçalho */}
-        <header
-          style={{
-            backgroundColor: colors.headerBg,
-            borderBottomColor: colors.borderHeader,
-          }}
-          className="px-6 pt-10 sm:pt-10 pb-3 border-b"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <h1 style={{ color: colors.titleText }} className="text-2xl font-black tracking-tight">
-                Note Verse
-              </h1>
-              <span className="text-[10px] border border-cyan-500 bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-full font-bold">
-                {user?.isPro ? 'PRO' : 'FREE'}
-              </span>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="p-1.5 rounded-full bg-slate-800/40 text-cyan-400 hover:bg-slate-700/50"
-              >
-                <User size={18} />
-              </button>
-              <button
-                onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-                className="p-1.5 rounded-full"
-              >
-                {isDark ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} className="text-indigo-600" />}
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Conteúdo Principal */}
-        <main style={{ backgroundColor: colors.bgFrame }} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {activeTab !== 'saved' && (
-            <div
-              style={{
-                backgroundColor: colors.cardBg,
-                borderColor: colors.cardBorder,
-              }}
-              className="border p-4 rounded-2xl shadow-lg space-y-3"
-            >
-              <div style={{ color: colors.titleText }} className="text-[11px] font-bold uppercase tracking-wider flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Volume2 size={14} /> Estúdio de Entrada
-                </span>
-                {isRecording && (
-                  <span className="text-red-400 font-mono text-xs font-bold animate-pulse">
-                    {recordingTime}s
-                  </span>
-                )}
-              </div>
-
-              {/* Ondas Sonoras */}
-              {isRecording ? (
-                <div className="flex flex-col items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <span className="text-xs text-red-400 font-bold">Captando voz...</span>
-                  <div className="flex items-center gap-1.5 h-8">
-                    {[0.6, 1, 0.4, 0.8, 1.2, 0.7, 0.5, 0.9, 0.3].map((factor, idx) => (
-                      <div
-                        key={idx}
-                        className="w-1.5 bg-red-400 rounded-full transition-all duration-75"
-                        style={{
-                          height: `${Math.min(32, Math.max(6, audioLevel * factor))}px`,
-                        }}
-                      ></div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2.5">
-                  <button
-                    onClick={handleToggleRecord}
-                    style={{
-                      backgroundColor: isDark ? '#231522' : '#fef2f2',
-                      color: '#f87171',
-                      borderColor: isDark ? '#451a28' : '#fecaca',
-                    }}
-                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border shadow-sm cursor-pointer"
-                  >
-                    <Mic size={14} />
-                    <span>Gravar Voz</span>
-                  </button>
-
-                  <label
-                    style={{
-                      backgroundColor: isDark ? '#0f2b3c' : '#f0f9ff',
-                      color: isDark ? '#38bdf8' : '#0284c7',
-                      borderColor: isDark ? '#164e63' : '#bae6fd',
-                    }}
-                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border cursor-pointer flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90"
-                  >
-                    <Upload size={14} />
-                    <span>Anexar Áudio</span>
-                    <input
-                      type="file"
-                      accept="audio/*,.mp3,.wav,.m4a"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              )}
-
-              {isRecording && (
-                <button
-                  onClick={handleToggleRecord}
-                  className="w-full py-1.5 bg-red-500/20 text-red-400 text-xs font-bold rounded-xl border border-red-500/30 hover:bg-red-500/30"
-                >
-                  Pausar Gravação
-                </button>
-              )}
-
-              {/* Botão GERAR */}
-              <button
-                disabled={isProcessing}
-                onClick={handleGenerateContent}
-                className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1 transition-all disabled:opacity-75 cursor-pointer"
-              >
-                <span>Gerar</span>
-                {isProcessing && (
-                  <span className="inline-flex tracking-widest font-extrabold text-sm animate-pulse">
-                    ...
-                  </span>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* ABA Transcrição */}
-          {activeTab === 'transcribe' && (
-            <div
-              style={{
-                backgroundColor: colors.cardBg,
-                borderColor: colors.cardBorder,
-              }}
-              className="border p-4 rounded-2xl shadow-md space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-400">Texto Transcrito</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => speakText(transcription)}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  >
-                    <Volume2 size={14} />
-                  </button>
-                  <button
-                    onClick={() => copyToClipboard(transcription, 'transcription')}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  >
-                    {copiedSection === 'transcription' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
-                {transcription}
-              </p>
-              <button
-                onClick={() => setShowSaveModal(true)}
-                className="w-full mt-2 py-2 bg-slate-800 text-cyan-400 font-bold text-xs rounded-xl border border-cyan-500/30 hover:bg-slate-700 flex items-center justify-center gap-1.5"
-              >
-                <Bookmark size={14} /> Salvar Nota
-              </button>
-            </div>
-          )}
-
-          {/* ABA Tradução */}
-          {activeTab === 'translate' && (
-            <div
-              style={{
-                backgroundColor: colors.cardBg,
-                borderColor: colors.cardBorder,
-              }}
-              className="border p-4 rounded-2xl shadow-md space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-400">Tradução (EN)</span>
-                <button
-                  onClick={() => copyToClipboard(translation, 'translation')}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                >
-                  {copiedSection === 'translation' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                </button>
-              </div>
-              <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
-                {translation}
-              </p>
-            </div>
-          )}
-
-          {/* ABA Resumo */}
-          {activeTab === 'summary' && (
-            <div
-              style={{
-                backgroundColor: colors.cardBg,
-                borderColor: colors.cardBorder,
-              }}
-              className="border p-4 rounded-2xl shadow-md space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-400">Resumo Executivo</span>
-                <button
-                  onClick={() => copyToClipboard(summary?.overview || '', 'summary')}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-                >
-                  {copiedSection === 'summary' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                </button>
-              </div>
-              <p className="text-xs leading-relaxed opacity-90">{summary?.overview}</p>
-              <div className="space-y-1 pt-2">
-                <span className="text-[11px] font-bold text-slate-400">Pontos Chave:</span>
-                {summary?.keyPoints.map((point, index) => (
-                  <div key={index} className="text-[11px] flex items-center gap-1.5 opacity-80">
-                    <Sparkles size={10} className="text-cyan-400" />
-                    <span>{point}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ABA Notas Salvas */}
-          {activeTab === 'saved' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
-                  <Folder size={14} /> Notas Salvas ({savedNotes.length})
-                </span>
-              </div>
-              {savedNotes.length === 0 ? (
-                <div className="text-center py-10 text-slate-500 text-xs">
-                  Nenhuma nota salva ainda.
-                </div>
-              ) : (
-                savedNotes.map((note) => (
-                  <div
-                    key={note.id}
-                    style={{
-                      backgroundColor: colors.cardBg,
-                      borderColor: colors.cardBorder,
-                    }}
-                    className="border p-3 rounded-2xl shadow-sm space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold">{note.title}</span>
-                      <button
-                        onClick={() => handleDeleteNote(note.id)}
-                        className="text-red-400 hover:text-red-300 p-1"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <p className="text-[11px] opacity-80 line-clamp-2">{note.transcription}</p>
-                    <div className="text-[10px] text-slate-500 flex justify-between">
-                      <span>{note.date}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </main>
-
-        {/* Menu Inferior */}
-        <footer
-          style={{
-            backgroundColor: colors.headerBg,
-            borderTopColor: colors.borderHeader,
-          }}
-          className="px-6 py-3 border-t flex justify-around items-center"
-        >
-          <button
-            onClick={() => setActiveTab('transcribe')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'transcribe' ? 'text-cyan-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <Mic size={18} />
-            <span className="text-[10px]">Transcrição</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('translate')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'translate' ? 'text-cyan-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <Globe2 size={18} />
-            <span className="text-[10px]">Tradução</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'summary' ? 'text-cyan-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <Sparkles size={18} />
-            <span className="text-[10px]">Resumo</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('saved')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'saved' ? 'text-cyan-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <Bookmark size={18} />
-            <span className="text-[10px]">Salvos</span>
-          </button>
-        </footer>
-
-        {/* MODAL SALVAR NOTA */}
-        {showSaveModal && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div
-              style={{
-                backgroundColor: colors.cardBg,
-                borderColor: colors.cardBorder,
-              }}
-              className="border w-full max-w-xs p-5 rounded-2xl shadow-2xl space-y-4"
-            >
-              <h3 className="text-sm font-bold text-cyan-400">Salvar Nota</h3>
-              <div className="space-y-1">
-                <label className="text-[11px] text-slate-400">Título da Nota</label>
-                <input
-                  type="text"
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-                  placeholder="Digite um título..."
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setShowSaveModal(false)}
-                  className="flex-1 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmSaveNote}
-                  className="flex-1 py-2 bg-cyan-500 text-black text-xs font-bold rounded-xl shadow-md"
-                >
-                  Salvar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        capturedText.
