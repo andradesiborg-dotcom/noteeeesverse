@@ -39,15 +39,15 @@ interface UserProfile {
   planType?: 'monthly' | 'quarterly' | 'annual';
 }
 
-// Lista de Idiomas e Mapeamento Nativo
+// Lista de Idiomas para a Tradução
 const LANGUAGES = [
-  { code: 'pt', name: 'Português (PT/BR)', prefix: '[Português]' },
-  { code: 'en', name: 'Inglês (US/UK)', prefix: '[English]' },
-  { code: 'es', name: 'Espanhol', prefix: '[Español]' },
-  { code: 'fr', name: 'Francês', prefix: '[Français]' },
-  { code: 'de', name: 'Alemão', prefix: '[Deutsch]' },
-  { code: 'it', name: 'Italiano', prefix: '[Italiano]' },
-  { code: 'zh', name: 'Mandarim', prefix: '[Mandarin]' },
+  { code: 'pt', name: 'Português (PT/BR)' },
+  { code: 'en', name: 'Inglês (US/UK)' },
+  { code: 'es', name: 'Espanhol' },
+  { code: 'fr', name: 'Francês' },
+  { code: 'de', name: 'Alemão' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'zh-CN', name: 'Mandarim' },
 ];
 
 export default function App() {
@@ -69,6 +69,7 @@ export default function App() {
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [audioLevel, setAudioLevel] = useState<number>(10);
   const [capturedText, setCapturedText] = useState<string>('');
 
@@ -94,12 +95,11 @@ export default function App() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // DETEÇÃO AUTOMÁTICA DO IDIOMA DO DISPOSITIVO DO UTILIZADOR
+  // DETEÇÃO AUTOMÁTICA DO IDIOMA DO DISPOSITIVO
   useEffect(() => {
     const deviceLang = navigator.language || (navigator as any).userLanguage || 'pt';
     const langCode = deviceLang.split('-')[0].toLowerCase();
 
-    // Se o idioma do telemóvel existir na lista, define-o automaticamente
     const matchedLang = LANGUAGES.find((l) => l.code === langCode);
     if (matchedLang) {
       setTargetLanguage(matchedLang.code);
@@ -200,8 +200,6 @@ export default function App() {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        
-        // Deteta o idioma de entrada do microfone do telemóvel do utilizador
         recognition.lang = navigator.language || 'pt-BR';
 
         recognition.onresult = (event: any) => {
@@ -242,10 +240,27 @@ export default function App() {
     }
   };
 
-  // TRADUÇÃO MULTI-IDIOMA
-  const translateText = (text: string, langCode: string) => {
-    const langObj = LANGUAGES.find((l) => l.code === langCode) || LANGUAGES[0];
-    return `${langObj.prefix}: "${text}"`;
+  // TRADUÇÃO REAL VIA API GRATUITA DO GOOGLE TRANSLATE
+  const translateTextReal = async (text: string, targetLang: string) => {
+    if (!text || text.startsWith('Grave um áudio')) return text;
+    setIsTranslating(true);
+    try {
+      const res = await fetch(
+        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(
+          text
+        )}`
+      );
+      const data = await res.json();
+      if (data && data[0]) {
+        const translatedResult = data[0].map((item: any) => item[0]).join('');
+        setIsTranslating(false);
+        return translatedResult;
+      }
+    } catch (e) {
+      console.error('Erro na tradução real:', e);
+    }
+    setIsTranslating(false);
+    return text;
   };
 
   // RESUMO DIRETO SEM PALAVRAS-CHAVE
@@ -272,21 +287,20 @@ export default function App() {
     return overviewText;
   };
 
-  // Trocar o idioma manualmente na aba de Tradução
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  // Trocar o idioma na aba de Tradução (Traduz em tempo real)
+  const handleLanguageChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
     setTargetLanguage(selected);
-    
-    if (capturedText || transcription) {
-      const currentSource = capturedText.trim() || transcription;
-      if (!currentSource.startsWith('Grave um áudio')) {
-        setTranslation(translateText(currentSource, selected));
-      }
+
+    const currentSource = capturedText.trim() || transcription;
+    if (currentSource && !currentSource.startsWith('Grave um áudio')) {
+      const translated = await translateTextReal(currentSource, selected);
+      setTranslation(translated);
     }
   };
 
   // BOTÃO GERAR
-  const handleGenerateContent = () => {
+  const handleGenerateContent = async () => {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
       stopAudioAnalysis();
@@ -300,26 +314,23 @@ export default function App() {
 
     setIsProcessing(true);
 
-    setTimeout(() => {
-      const baseText =
-        capturedText.trim() ||
-        'Áudio gravado com sucesso no Note Verse.';
+    const baseText = capturedText.trim() || 'Áudio gravado com sucesso no Note Verse.';
 
-      // 1. Transcrição
-      setTranscription(baseText);
+    // 1. Transcrição
+    setTranscription(baseText);
 
-      // 2. Tradução Dinâmica no Idioma Selecionado ou Detetado do Aparelho
-      setTranslation(translateText(baseText, targetLanguage));
+    // 2. Resumo Direto
+    setSummary(generateCleanSummary(baseText));
 
-      // 3. Resumo Direto
-      setSummary(generateCleanSummary(baseText));
+    if (!customTitle) {
+      setCustomTitle(baseText.slice(0, 25) + '...');
+    }
 
-      if (!customTitle) {
-        setCustomTitle(baseText.slice(0, 25) + '...');
-      }
+    // 3. Tradução Real para o Idioma Selecionado
+    const translatedText = await translateTextReal(baseText, targetLanguage);
+    setTranslation(translatedText);
 
-      setIsProcessing(false);
-    }, 1200);
+    setIsProcessing(false);
   };
 
   const handleOpenSaveModal = () => {
@@ -369,7 +380,7 @@ export default function App() {
         return;
       }
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = navigator.language || 'pt-BR';
+      utterance.lang = targetLanguage;
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
       setIsSpeaking(true);
@@ -629,7 +640,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA 2: Tradução (Com Seletor de Idiomas) */}
+          {/* ABA 2: Tradução (Com Tradução Real) */}
           {activeTab === 'translate' && (
             <div
               style={{
@@ -677,9 +688,15 @@ export default function App() {
                 </div>
               </div>
 
-              <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
-                {translation}
-              </p>
+              {isTranslating ? (
+                <div className="text-xs text-cyan-400 font-bold animate-pulse py-2">
+                  Traduzindo texto...
+                </div>
+              ) : (
+                <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
+                  {translation}
+                </p>
+              )}
             </div>
           )}
 
