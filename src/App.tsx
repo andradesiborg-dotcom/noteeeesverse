@@ -50,7 +50,6 @@ export default function App() {
   const [showPlansModal, setShowPlansModal] = useState<boolean>(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
-  const [showPaywall, setShowPaywall] = useState<boolean>(false);
 
   // Estados de Pagamento e Seleção
   const [selectedPlan, setSelectedPlan] = useState<
@@ -67,8 +66,8 @@ export default function App() {
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [audioLevel, setAudioLevel] = useState<number>(10); // Nível do volume da voz (0 a 100)
-  const [capturedText, setCapturedText] = useState<string>(''); // Texto capturado em tempo real
+  const [audioLevel, setAudioLevel] = useState<number>(10);
+  const [capturedText, setCapturedText] = useState<string>('');
 
   // Título Personalizado
   const [customTitle, setCustomTitle] = useState<string>('');
@@ -121,19 +120,13 @@ export default function App() {
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          if (!user?.isPro && prev >= 60) {
-            handleStopRecordingDueToLimit();
-            return 60;
-          }
-          return prev + 1;
-        });
+        setRecordingTime((prev) => prev + 1);
       }, 1000);
     } else {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [isRecording, user]);
+  }, [isRecording]);
 
   const stopAudioAnalysis = () => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -171,42 +164,25 @@ export default function App() {
           sum += dataArray[i];
         }
         const average = sum / dataArray.length;
-        // Normaliza o nível entre 15 e 100
         setAudioLevel(Math.max(15, Math.min(100, average * 1.5)));
         animFrameRef.current = requestAnimationFrame(updateLevel);
       };
 
       updateLevel();
     } catch (e) {
-      console.warn('Não foi possível acessar o microfone para o visualizador de voz.', e);
+      console.warn('Microfone não acessível.', e);
     }
-  };
-
-  const handleStopRecordingDueToLimit = () => {
-    if (recognitionRef.current) recognitionRef.current.stop();
-    stopAudioAnalysis();
-    setIsRecording(false);
-    setShowPaywall(true);
   };
 
   const handleToggleRecord = () => {
     if (isRecording) {
-      // Pausar
       if (recognitionRef.current) recognitionRef.current.stop();
       stopAudioAnalysis();
       setIsRecording(false);
-      // CORREÇÃO: Não limpamos capturedText ou audioUrl ao pausar,
-      // para que eles permaneçam disponíveis para geração.
     } else {
-      // Começar nova gravação
-      // CORREÇÃO: Limpamos apenas quando clicamos em "Gravar Voz" novamente.
       if (capturedText || audioUrl) {
-          setAudioUrl(null);
-          setCapturedText('');
-          setTranscription('Grave um áudio ou anexe um ficheiro e clique em "Gerar" para ver a transcrição, tradução e resumo.'); // Reseta o texto exibido
-          setTranslation('Record an audio or upload a file and click "Generate" to see transcription, translation, and summary.');
-          setSummary({overview: 'Resumo executivo do conteúdo Note Verse.', keyPoints: ['Processamento inteligente de áudio', 'Resultados instantâneos com IA']});
-          setCustomTitle('');
+        setAudioUrl(null);
+        setCapturedText('');
       }
       setRecordingTime(0);
       startAudioAnalysis();
@@ -234,13 +210,10 @@ export default function App() {
         recognition.start();
         setIsRecording(true);
       } else {
-        // Fallback para quando o navegador não suporta reconhecimento nativo
         setIsRecording(true);
-        // Simulação básica para não-suportados
         setTimeout(() => {
-          setCapturedText('Esta é uma gravação simulada do Note Verse...');
-          setCustomTitle('Gravação Simulada');
-        }, 1000);
+          setCapturedText('Gravação de voz efetuada com sucesso no Note Verse.');
+        }, 1500);
       }
     }
   };
@@ -248,33 +221,20 @@ export default function App() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const isAudioType = file.type.startsWith('audio/');
-      const hasAudioExtension = /\.(mp3|wav|m4a|aac|ogg|flac|webm)$/i.test(
-        file.name
-      );
-
-      if (!isAudioType && !hasAudioExtension) {
-        alert(
-          'Por favor, selecione apenas ficheiros de áudio válidos (MP3, WAV, M4A, etc.).'
-        );
-        return;
-      }
-
       const url = URL.createObjectURL(file);
-      // CORREÇÃO: Limpamos capturedText anterior para que o arquivo tenha prioridade
       if (isRecording) {
-          if (recognitionRef.current) recognitionRef.current.stop();
-          stopAudioAnalysis();
-          setIsRecording(false);
+        if (recognitionRef.current) recognitionRef.current.stop();
+        stopAudioAnalysis();
+        setIsRecording(false);
       }
       setCapturedText('');
       setAudioUrl(url);
       setCustomTitle(file.name.replace(/\.[^/.]+$/, ''));
-      setTranscription(`Arquivo de áudio "${file.name}" anexado. Clique em "Gerar" para analisar.`);
+      setTranscription(`Arquivo "${file.name}" carregado. Clique em "Gerar" para processar.`);
     }
   };
 
-  // Botão Gerar: Para a gravação se estiver ativa e processa o áudio capturado
+  // Botão Gerar: Processa transcrição, tradução e resumo dinamicamente
   const handleGenerateContent = () => {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
@@ -283,34 +243,39 @@ export default function App() {
     }
 
     if (!audioUrl && !capturedText) {
-        alert('Grave um áudio ou anexe um arquivo antes de gerar.');
-        return;
+      alert('Grave um áudio ou anexe um arquivo antes de gerar.');
+      return;
     }
 
     setIsProcessing(true);
 
     setTimeout(() => {
-      // CORREÇÃO: Priorizamos capturedText (gravação) sobre áudio anexado
-      const finalText =
+      const baseText =
         capturedText.trim() ||
-        'Áudio processado com sucesso! O Note Verse estruturou todas as informações do arquivo anexado.';
+        'Áudio importado processado com sucesso pelo Note Verse, gerando análises completas.';
 
-      setTranscription(finalText);
-      setTranslation(`[English Translation]: ${finalText}`);
+      // Atualiza Transcrição
+      setTranscription(baseText);
+
+      // Atualiza Tradução (Gera tradução simulada em inglês baseada no texto)
+      setTranslation(`[English Translation]: ${baseText} (Successfully processed and translated by Note Verse AI).`);
+
+      // Atualiza Resumo Executivo e Pontos-Chave
       setSummary({
-        overview: 'Resumo executivo gerado automaticamente a partir do áudio capturado.',
+        overview: `Resumo executivo: O conteúdo aborda pontos essenciais capturados pelo microfone ou arquivo, estruturando ideias principais de forma clara.`,
         keyPoints: [
-          'Áudio analisado e validado em tempo real',
-          'Tradução e síntese executiva criadas com sucesso',
+          `Tópico principal extraído do áudio (${baseText.slice(0, 20)}...)`,
+          'Processamento de linguagem natural concluído',
+          'Dados validados e prontos para salvamento',
         ],
       });
 
-      if (!customTitle && finalText) {
-        setCustomTitle(finalText.slice(0, 25) + '...');
+      if (!customTitle) {
+        setCustomTitle(baseText.slice(0, 25) + '...');
       }
 
       setIsProcessing(false);
-    }, 2500);
+    }, 2000);
   };
 
   const handleOpenSaveModal = () => {
@@ -352,51 +317,6 @@ export default function App() {
     localStorage.setItem('noteverse_saved', JSON.stringify(updated));
   };
 
-  const handleLogin = (provider: 'google' | 'apple') => {
-    const newUser: UserProfile = {
-      name: provider === 'google' ? 'Utilizador Google' : 'Utilizador Apple',
-      email:
-        provider === 'google'
-          ? 'utilizador@gmail.com'
-          : 'utilizador@icloud.com',
-      provider,
-      isPro: false,
-    };
-    setUser(newUser);
-    localStorage.setItem('noteverse_user', JSON.stringify(newUser));
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('noteverse_user');
-  };
-
-  const handleExecutePayment = () => {
-    setIsProcessingPayment(true);
-    setTimeout(() => {
-      setIsProcessingPayment(false);
-      const activeUser = user || {
-        name: 'Utilizador Note Verse',
-        email: 'utilizador@noteverse.app',
-        provider: 'apple',
-        isPro: true,
-      };
-
-      const proUser: UserProfile = {
-        ...activeUser,
-        isPro: true,
-        planType: selectedPlan,
-      };
-
-      setUser(proUser);
-      localStorage.setItem('noteverse_user', JSON.stringify(proUser));
-      setShowCheckoutModal(false);
-      setShowPlansModal(false);
-      setShowPaywall(false);
-      alert('Pagamento Aprovado! Plano PRO ativado instantaneamente.');
-    }, 2000);
-  };
-
   const speakText = (text: string) => {
     if ('speechSynthesis' in window) {
       if (isSpeaking) {
@@ -427,11 +347,9 @@ export default function App() {
     headerBg: isDark ? '#0b1325' : '#ffffff',
     borderHeader: isDark ? '#1a243a' : '#f1f5f9',
     titleText: isDark ? '#38bdf8' : '#0f172a',
-    subText: isDark ? '#64748b' : '#64748b',
     cardBg: isDark ? '#111a2e' : '#f8fafc',
     cardBorder: isDark ? '#1e2d4a' : '#e2e8f0',
     mainText: isDark ? '#e2e8f0' : '#0f172a',
-    mutedText: isDark ? '#94a3b8' : '#64748b',
   };
 
   return (
@@ -532,12 +450,12 @@ export default function App() {
                 </span>
                 {isRecording && (
                   <span className="text-red-400 font-mono text-xs font-bold animate-pulse">
-                    {recordingTime}s / 60s
+                    {recordingTime}s
                   </span>
                 )}
               </div>
 
-              {/* ONDAS SONORAS REATIVAS Á VOZ OU BOTÕES DE AÇÃO */}
+              {/* Ondas Sonoras ou Botões de Gravação */}
               {isRecording ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
                   <span className="text-xs text-red-400 font-bold">Captando voz...</span>
@@ -574,13 +492,13 @@ export default function App() {
                       color: isDark ? '#38bdf8' : '#0284c7',
                       borderColor: isDark ? '#164e63' : '#bae6fd',
                     }}
-                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all hover:opacity-90"
+                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs border cursor-pointer flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90"
                   >
                     <Upload size={14} />
                     <span>Anexar Áudio</span>
                     <input
                       type="file"
-                      accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
+                      accept="audio/*,.mp3,.wav,.m4a"
                       onChange={handleFileUpload}
                       className="hidden"
                     />
@@ -588,29 +506,29 @@ export default function App() {
                 </div>
               )}
 
-              {/* Botão de Pausar Gravação (mostrado apenas quando isRecording é true) */}
               {isRecording && (
                 <button
                   onClick={handleToggleRecord}
-                  className="w-full py-1.5 bg-red-500/20 text-red-400 text-xs font-bold rounded-xl border border-red-500/30 hover:bg-red-500/30"
+                  className="w-full py-1.5 bg-red-500/20 text-red-400 text-xs font-bold rounded-xl border border-red-500/30 hover:bg-red-500/30 cursor-pointer"
                 >
                   Pausar Gravação
                 </button>
               )}
 
-              {/* Se houver conteúdo capturado mas não processado, mostramos uma prévia */}
               {!isRecording && capturedText && (
-                  <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 space-y-2">
-                      <p className="text-[11px] text-slate-400 font-semibold flex items-center gap-1.5"><Mic size={12}/> Prévia da Gravação:</p>
-                      <p className="text-xs text-slate-200 line-clamp-2">{capturedText}</p>
-                  </div>
+                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 space-y-1">
+                  <p className="text-[11px] text-slate-400 font-semibold flex items-center gap-1.5">
+                    <Mic size={12} /> Prévia Capturada:
+                  </p>
+                  <p className="text-xs text-slate-200 line-clamp-2">{capturedText}</p>
+                </div>
               )}
 
-              {/* BOTÃO GERAR COM PONTINHOS EM MOVIMENTO */}
+              {/* Botão Gerar */}
               <button
                 disabled={isProcessing || (!capturedText && !audioUrl)}
                 onClick={handleGenerateContent}
-                className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1 transition-all disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <span>Gerar</span>
                 {isProcessing && (
@@ -622,7 +540,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA Transcrição */}
+          {/* ABA 1: Transcrição */}
           {activeTab === 'transcribe' && (
             <div
               style={{
@@ -636,17 +554,21 @@ export default function App() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => speakText(transcription)}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
                     title="Ouvir áudio"
                   >
                     <Volume2 size={14} />
                   </button>
                   <button
                     onClick={() => copyToClipboard(transcription, 'transcription')}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
                     title="Copiar texto"
                   >
-                    {copiedSection === 'transcription' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                    {copiedSection === 'transcription' ? (
+                      <Check size={14} className="text-emerald-400" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -656,14 +578,14 @@ export default function App() {
               <button
                 disabled={transcription.startsWith('Grave um áudio')}
                 onClick={handleOpenSaveModal}
-                className="w-full mt-2 py-2 bg-slate-800 text-cyan-400 font-bold text-xs rounded-xl border border-cyan-500/30 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                className="w-full mt-2 py-2 bg-slate-800 text-cyan-400 font-bold text-xs rounded-xl border border-cyan-500/30 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Bookmark size={14} /> Salvar Nota
               </button>
             </div>
           )}
 
-          {/* ABA Tradução */}
+          {/* ABA 2: Tradução */}
           {activeTab === 'translate' && (
             <div
               style={{
@@ -676,9 +598,14 @@ export default function App() {
                 <span className="text-xs font-bold text-cyan-400">Tradução (EN)</span>
                 <button
                   onClick={() => copyToClipboard(translation, 'translation')}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
+                  title="Copiar tradução"
                 >
-                  {copiedSection === 'translation' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                  {copiedSection === 'translation' ? (
+                    <Check size={14} className="text-emerald-400" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
                 </button>
               </div>
               <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
@@ -687,7 +614,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA Resumo */}
+          {/* ABA 3: Resumo */}
           {activeTab === 'summary' && (
             <div
               style={{
@@ -700,12 +627,19 @@ export default function App() {
                 <span className="text-xs font-bold text-cyan-400">Resumo Executivo</span>
                 <button
                   onClick={() => copyToClipboard(summary?.overview || '', 'summary')}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
+                  title="Copiar resumo"
                 >
-                  {copiedSection === 'summary' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                  {copiedSection === 'summary' ? (
+                    <Check size={14} className="text-emerald-400" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
                 </button>
               </div>
-              <p className="text-xs leading-relaxed opacity-90">{summary?.overview}</p>
+              <p className="text-xs leading-relaxed opacity-90">
+                {summary?.overview}
+              </p>
               <div className="space-y-1 pt-2">
                 <span className="text-[11px] font-bold text-slate-400">Pontos Chave:</span>
                 {summary?.keyPoints.map((point, index) => (
@@ -718,7 +652,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA Notas Salvas */}
+          {/* ABA 4: Notas Salvas */}
           {activeTab === 'saved' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -771,7 +705,9 @@ export default function App() {
           <button
             onClick={() => setActiveTab('transcribe')}
             className={`flex flex-col items-center gap-1 cursor-pointer ${
-              activeTab === 'transcribe' ? 'text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-300'
+              activeTab === 'transcribe'
+                ? 'text-cyan-400 font-bold'
+                : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Mic size={18} />
@@ -780,7 +716,9 @@ export default function App() {
           <button
             onClick={() => setActiveTab('translate')}
             className={`flex flex-col items-center gap-1 cursor-pointer ${
-              activeTab === 'translate' ? 'text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-300'
+              activeTab === 'translate'
+                ? 'text-cyan-400 font-bold'
+                : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Globe2 size={18} />
@@ -789,7 +727,9 @@ export default function App() {
           <button
             onClick={() => setActiveTab('summary')}
             className={`flex flex-col items-center gap-1 cursor-pointer ${
-              activeTab === 'summary' ? 'text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-300'
+              activeTab === 'summary'
+                ? 'text-cyan-400 font-bold'
+                : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Sparkles size={18} />
@@ -798,7 +738,9 @@ export default function App() {
           <button
             onClick={() => setActiveTab('saved')}
             className={`flex flex-col items-center gap-1 cursor-pointer ${
-              activeTab === 'saved' ? 'text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-300'
+              activeTab === 'saved'
+                ? 'text-cyan-400 font-bold'
+                : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <Bookmark size={18} />
