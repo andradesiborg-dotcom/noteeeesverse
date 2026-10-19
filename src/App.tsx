@@ -210,7 +210,6 @@ export default function App() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validação estrita: aceita apenas ficheiros de áudio reais ou extensões compatíveis
       const isAudioType = file.type.startsWith('audio/');
       const hasAudioExtension = /\.(mp3|wav|m4a|aac|ogg|flac|webm)$/i.test(
         file.name
@@ -300,7 +299,6 @@ export default function App() {
     localStorage.removeItem('noteverse_user');
   };
 
-  // Processar Compra Instantânea
   const handleExecutePayment = () => {
     setIsProcessingPayment(true);
     setTimeout(() => {
@@ -369,7 +367,6 @@ export default function App() {
       style={{ backgroundColor: colors.bgApp, color: colors.mainText }}
       className="min-h-screen flex items-center justify-center p-0 sm:p-4 font-sans transition-colors duration-300"
     >
-      {/* Moldura do iPhone */}
       <div
         style={{
           backgroundColor: colors.bgFrame,
@@ -516,9 +513,498 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* Seletor de Abas */}
+              <div className="flex border-b border-slate-700/50 pb-2 gap-2">
+                <button
+                  onClick={() => setActiveTab('transcribe')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    activeTab === 'transcribe'
+                      ? 'bg-cyan-500 text-black shadow-md'
+                      : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/50'
+                  }`}
+                >
+                  Transcrição
+                </button>
+                <button
+                  onClick={() => setActiveTab('translate')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    activeTab === 'translate'
+                      ? 'bg-cyan-500 text-black shadow-md'
+                      : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/50'
+                  }`}
+                >
+                  Tradução
+                </button>
+                <button
+                  onClick={() => setActiveTab('summary')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    activeTab === 'summary'
+                      ? 'bg-cyan-500 text-black shadow-md'
+                      : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/50'
+                  }`}
+                >
+                  Resumo
+                </button>
+              </div>
+
+              {/* Exibição da Aba Ativa */}
+              {activeTab === 'transcribe' && (
+                <div
+                  style={{
+                    backgroundColor: colors.cardBg,
+                    borderColor: colors.cardBorder,
+                  }}
+                  className="border p-4 rounded-2xl shadow-md space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-cyan-400">
+                      Texto Transcrito
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => speakText(transcription)}
+                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        title="Ouvir áudio"
+                      >
+                        <Volume2 size={14} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          copyToClipboard(transcription, 'transcription')
+                        }
+                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        title="Copiar texto"
+                      >
+                        {copiedSection === 'transcription' ? (
+                          <Check size={14} className="text-emerald-400" />
+                        ) : (
+                          <Copy size={14} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
+                    {transcription}
+                  </p>
+                  <button
+                    onClick={handleOpenSaveModal}
+                    className="w-full mt-2 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-xs rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1.5"
+                  >
+                    <Bookmark size={14} /> Salvar Nota
+                  </button>
+                </div>
+              )}
+
+              {activeTab === 'translate' && (
+                <div
+                  style={{
+                    backgroundColor: colors.cardBg,
+                    borderColor: colors.cardBorder,
+                  }}
+                  className="border p-4 rounded-2xl shadow-md space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-cyan-400">
+                      Tradução (EN)
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(translation, 'translation')}
+                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    >
+                      {copiedSection === 'translation' ? (
+                        <Check size={14} className="text-emerald-400" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
+                    {translation}
+                  </p>
+                </div>
+              )}
+
+              {activeTab === 'summary' && (
+                <div
+                  style={{
+                    backgroundColor: colors.cardBg,
+                    borderColor: colors.cardBorder,
+                  }}
+                  className="border p-4 rounded-2xl shadow-md space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-cyan-400">
+                      Resumo Executivo
+                    </span>
+                    <button
+                      onClick={() =>
+                        copyToClipboard(summary?.overview || '', 'summary')
+                      }
+                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    >
+                      {copiedSection === 'summary' ? (
+                        <Check size={14} className="text-emerald-400" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs leading-relaxed opacity-90">
+                    {summary?.overview}
+                  </p>
+                  <div className="space-y-1 pt-2">
+                    <span className="text-[11px] font-bold text-slate-400">
+                      Pontos Chave:
+                    </span>
+                    {summary?.keyPoints.map((point, index) => (
+                      <div
+                        key={index}
+                        className="text-[11px] flex items-center gap-1.5 opacity-80"
+                      >
+                        <Sparkles size={10} className="text-cyan-400" />
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
-          ) : null}
+          ) : (
+            /* Aba de Notas Salvas */
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                  <Folder size={14} /> Notas Salvas ({savedNotes.length})
+                </span>
+              </div>
+              {savedNotes.length === 0 ? (
+                <div className="text-center py-10 text-slate-500 text-xs">
+                  Nenhuma nota salva ainda.
+                </div>
+              ) : (
+                savedNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    style={{
+                      backgroundColor: colors.cardBg,
+                      borderColor: colors.cardBorder,
+                    }}
+                    className="border p-3 rounded-2xl shadow-sm space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold">{note.title}</span>
+                      <button
+                        onClick={() => handleDeleteNote(note.id)}
+                        className="text-red-400 hover:text-red-300 p-1"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <p className="text-[11px] opacity-80 line-clamp-2">
+                      {note.transcription}
+                    </p>
+                    <div className="text-[10px] text-slate-500 flex justify-between">
+                      <span>{note.date}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </main>
+
+        {/* Rodapé / Menu Inferior */}
+        <footer
+          style={{
+            backgroundColor: colors.headerBg,
+            borderTopColor: colors.borderHeader,
+          }}
+          className="px-6 py-3 border-t flex justify-around items-center"
+        >
+          <button
+            onClick={() => setActiveTab('transcribe')}
+            className={`flex flex-col items-center gap-1 ${
+              activeTab === 'transcribe'
+                ? 'text-cyan-400'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Mic size={18} />
+            <span className="text-[10px] font-semibold">Gravar</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('translate')}
+            className={`flex flex-col items-center gap-1 ${
+              activeTab === 'translate'
+                ? 'text-cyan-400'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Globe2 size={18} />
+            <span className="text-[10px] font-semibold">Traduzir</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('summary')}
+            className={`flex flex-col items-center gap-1 ${
+              activeTab === 'summary'
+                ? 'text-cyan-400'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Sparkles size={18} />
+            <span className="text-[10px] font-semibold">Resumo</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('saved')}
+            className={`flex flex-col items-center gap-1 ${
+              activeTab === 'saved'
+                ? 'text-cyan-400'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Bookmark size={18} />
+            <span className="text-[10px] font-semibold">Salvos</span>
+          </button>
+        </footer>
+
+        {/* MODAL DE SALVAR NOTA */}
+        {showSaveModal && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border w-full max-w-xs p-5 rounded-2xl shadow-2xl space-y-4"
+            >
+              <h3 className="text-sm font-bold text-cyan-400">Salvar Nota</h3>
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-400">
+                  Título da Nota
+                </label>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  placeholder="Digite um título..."
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setShowSaveModal(false)}
+                  className="flex-1 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmSaveNote}
+                  className="flex-1 py-2 bg-cyan-500 text-black text-xs font-bold rounded-xl hover:bg-cyan-400 shadow-md"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL DE PERFIL / AUTH */}
+        {showAuthModal && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border w-full max-w-xs p-5 rounded-2xl shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-cyan-400">
+                  Conta Note Verse
+                </h3>
+                <button
+                  onClick={() => setShowAuthModal(false)}
+                  className="text-slate-400 hover:text-white text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {user ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-800 space-y-1">
+                    <p className="text-xs font-bold text-white">{user.name}</p>
+                    <p className="text-[10px] text-slate-400">{user.email}</p>
+                    <span className="inline-block mt-1 text-[9px] px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full font-bold">
+                      {user.isPro ? 'Plano PRO Ativo' : 'Plano FREE'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowAuthModal(false);
+                      setShowPlansModal(true);
+                    }}
+                    className="w-full py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-black text-xs font-bold rounded-xl shadow-md hover:opacity-90 flex items-center justify-center gap-1.5"
+                  >
+                    <Crown size={14} /> Ver Planos PRO
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setShowAuthModal(false);
+                    }}
+                    className="w-full py-2 bg-red-500/20 text-red-400 text-xs font-bold rounded-xl hover:bg-red-500/30 flex items-center justify-center gap-1.5"
+                  >
+                    <LogOut size={14} /> Terminar Sessão
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400 text-center">
+                    Inicie sessão para sincronizar suas notas e acessar recursos avançados.
+                  </p>
+                  <button
+                    onClick={() => {
+                      handleLogin('google');
+                      setShowAuthModal(false);
+                    }}
+                    className="w-full py-2.5 bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-slate-700 flex items-center justify-center gap-2 border border-slate-700"
+                  >
+                    Continuar com Google
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleLogin('apple');
+                      setShowAuthModal(false);
+                    }}
+                    className="w-full py-2.5 bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-slate-700 flex items-center justify-center gap-2 border border-slate-700"
+                  >
+                    Continuar com Apple
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* MODAL DE PLANOS PRO */}
+        {showPlansModal && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border w-full max-w-xs p-5 rounded-2xl shadow-2xl space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-1">
+                  <Crown size={14} /> Note Verse PRO
+                </h3>
+                <button
+                  onClick={() => setShowPlansModal(false)}
+                  className="text-slate-400 hover:text-white text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-2">
+                <div
+                  onClick={() => setSelectedPlan('monthly')}
+                  className={`p-3 rounded-xl border cursor-pointer ${
+                    selectedPlan === 'monthly'
+                      ? 'bg-cyan-500/10 border-cyan-400 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                  }`}
+                >
+                  <p className="text-xs font-bold">Mensal</p>
+                  <p className="text-sm font-black text-cyan-400">R$ 29,90</p>
+                </div>
+                <div
+                  onClick={() => setSelectedPlan('annual')}
+                  className={`p-3 rounded-xl border cursor-pointer ${
+                    selectedPlan === 'annual'
+                      ? 'bg-cyan-500/10 border-cyan-400 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                  }`}
+                >
+                  <p className="text-xs font-bold">Anual (Melhor Valor)</p>
+                  <p className="text-sm font-black text-cyan-400">R$ 214,80/ano</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPlansModal(false);
+                  setShowCheckoutModal(true);
+                }}
+                className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-black text-xs font-bold rounded-xl shadow-md hover:opacity-90"
+              >
+                Assinar Agora
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL DE CHECKOUT */}
+        {showCheckoutModal && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border w-full max-w-xs p-5 rounded-2xl shadow-2xl space-y-3"
+            >
+              <h3 className="text-sm font-bold text-cyan-400">Pagamento</h3>
+              <p className="text-xs text-slate-400">
+                Escolha o método de pagamento para ativar o plano PRO instantaneamente.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPaymentMethod('pix')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl border ${
+                    paymentMethod === 'pix'
+                      ? 'bg-cyan-500 text-black border-cyan-400'
+                      : 'bg-slate-900 text-slate-400 border-slate-800'
+                  }`}
+                >
+                  PIX
+                </button>
+                <button
+                  onClick={() => setPaymentMethod('card')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl border ${
+                    paymentMethod === 'card'
+                      ? 'bg-cyan-500 text-black border-cyan-400'
+                      : 'bg-slate-900 text-slate-400 border-slate-800'
+                  }`}
+                >
+                  Cartão
+                </button>
+              </div>
+              <button
+                disabled={isProcessingPayment}
+                onClick={handleExecutePayment}
+                className="w-full py-2.5 bg-emerald-500 text-black text-xs font-bold rounded-xl shadow-md hover:bg-emerald-400 flex items-center justify-center gap-1.5"
+              >
+                {isProcessingPayment ? (
+                  <>
+                    <RefreshCw className="animate-spin" size={14} />
+                    Processando...
+                  </>
+                ) : (
+                  'Concluir Pagamento'
+                )}
+              </button>
+              <button
+                onClick={() => setShowCheckoutModal(false)}
+                className="w-full py-1 text-slate-500 text-[11px] font-bold"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
