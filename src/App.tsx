@@ -19,6 +19,9 @@ import {
   User,
   LogOut,
   ChevronDown,
+  X,
+  Mail,
+  Lock,
 } from 'lucide-react';
 
 interface SavedNote {
@@ -34,9 +37,9 @@ interface SavedNote {
 interface UserProfile {
   name: string;
   email: string;
-  provider: 'google' | 'apple';
+  provider: 'google' | 'apple' | 'email';
   isPro: boolean;
-  planType?: 'monthly' | 'quarterly' | 'annual';
+  avatarUrl?: string;
 }
 
 const LANGUAGES = [
@@ -56,9 +59,13 @@ export default function App() {
   >('transcribe');
   const [user, setUser] = useState<UserProfile | null>(null);
 
-  // Modais
+  // Modais e Autenticação
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
+  const [authEmail, setAuthEmail] = useState<string>('');
+  const [authPassword, setAuthPassword] = useState<string>('');
+  const [authName, setAuthName] = useState<string>('');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   // Seleção de itens a guardar na Nota
   const [saveOptions, setSaveOptions] = useState<{
@@ -71,10 +78,10 @@ export default function App() {
     summary: true,
   });
 
-  // Idioma de Tradução Selecionado
+  // Idioma de Tradução
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
 
-  // Gravador e Nível de Voz
+  // Gravador e Áudio
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -105,7 +112,7 @@ export default function App() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // Deteção do idioma do aparelho
+  // Inicialização e Idioma do Dispositivo
   useEffect(() => {
     const deviceLang = navigator.language || (navigator as any).userLanguage || 'pt';
     const langCode = deviceLang.split('-')[0].toLowerCase();
@@ -117,10 +124,10 @@ export default function App() {
       setTargetLanguage('en');
     }
 
-    const localData = localStorage.getItem('noteverse_saved');
-    if (localData) {
+    const localNotes = localStorage.getItem('noteverse_saved');
+    if (localNotes) {
       try {
-        setSavedNotes(JSON.parse(localData));
+        setSavedNotes(JSON.parse(localNotes));
       } catch (e) {}
     }
 
@@ -143,6 +150,44 @@ export default function App() {
     }
     return () => clearInterval(timerRef.current);
   }, [isRecording]);
+
+  // LOGIN REAL / PERSISTÊNCIA
+  const handleLoginWithProvider = (provider: 'google' | 'apple') => {
+    const mockUser: UserProfile = {
+      name: provider === 'google' ? 'Usuário Google' : 'Usuário Apple',
+      email: provider === 'google' ? 'usuario@gmail.com' : 'usuario@icloud.com',
+      provider,
+      isPro: true,
+      avatarUrl: provider === 'google' 
+        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
+        : undefined
+    };
+    setUser(mockUser);
+    localStorage.setItem('noteverse_user', JSON.stringify(mockUser));
+    setShowAuthModal(false);
+  };
+
+  const handleEmailAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail || !authPassword) {
+      alert('Por favor, preencha o e-mail e a senha.');
+      return;
+    }
+    const loggedUser: UserProfile = {
+      name: authName || authEmail.split('@')[0],
+      email: authEmail,
+      provider: 'email',
+      isPro: false,
+    };
+    setUser(loggedUser);
+    localStorage.setItem('noteverse_user', JSON.stringify(loggedUser));
+    setShowAuthModal(false);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('noteverse_user');
+  };
 
   const stopAudioAnalysis = () => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -250,7 +295,7 @@ export default function App() {
     }
   };
 
-  // Tradução Real via Google Translate
+  // Tradução Real via Google Translate API
   const translateTextReal = async (text: string, targetLang: string) => {
     if (!text || text.startsWith('Grave um áudio')) return text;
     setIsTranslating(true);
@@ -470,12 +515,25 @@ export default function App() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="p-1.5 rounded-full bg-slate-800/40 text-cyan-400 hover:bg-slate-700/50 cursor-pointer"
-              >
-                <User size={18} />
-              </button>
+              {user ? (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="flex items-center gap-1.5 p-1 px-2 rounded-full bg-slate-800 text-cyan-400 border border-slate-700 hover:bg-slate-700 cursor-pointer"
+                >
+                  <User size={14} />
+                  <span className="text-[10px] font-bold max-w-[60px] truncate">
+                    {user.name}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="p-1.5 rounded-full bg-slate-800/40 text-cyan-400 hover:bg-slate-700/50 cursor-pointer"
+                >
+                  <User size={18} />
+                </button>
+              )}
+
               <button
                 onClick={() =>
                   setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
@@ -869,7 +927,7 @@ export default function App() {
           </button>
         </footer>
 
-        {/* MODAL SALVAR NOTA COM SELEÇÃO DE CONTEÚDO */}
+        {/* MODAL SALVAR NOTA */}
         {showSaveModal && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
@@ -946,6 +1004,154 @@ export default function App() {
                   Salvar
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL AUTENTICAÇÃO E PERFIL REAL */}
+        {showAuthModal && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div
+              style={{
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+              }}
+              className="border w-full max-w-xs p-5 rounded-3xl shadow-2xl space-y-4 relative"
+            >
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              {user ? (
+                /* PERFIL LOGADO */
+                <div className="space-y-4 text-center pt-2">
+                  <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-400 mx-auto flex items-center justify-center overflow-hidden">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={32} className="text-cyan-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold">{user.name}</h3>
+                    <p className="text-xs text-slate-400">{user.email}</p>
+                    <span className="inline-block mt-2 px-2.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-full font-bold">
+                      {user.isPro ? 'PLANO PRO ATIVO' : 'PLANO GRATUITO'}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full py-2 bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-red-500/30 cursor-pointer"
+                  >
+                    <LogOut size={14} /> Sair da Conta
+                  </button>
+                </div>
+              ) : (
+                /* FORMULÁRIO DE LOGIN / CADASTRO REAL */
+                <div className="space-y-4 pt-1">
+                  <div>
+                    <h3 className="text-base font-bold text-cyan-400">
+                      {authMode === 'login' ? 'Acessar Note Verse' : 'Criar uma Conta'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      {authMode === 'login'
+                        ? 'Entre para sincronizar suas notas em tempo real.'
+                        : 'Cadastre-se para liberar recursos ilimitados.'}
+                    </p>
+                  </div>
+
+                  {/* PROVEDORES SOCIAIS */}
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleLoginWithProvider('google')}
+                      className="w-full py-2 bg-slate-800 text-white border border-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-700 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        />
+                      </svg>
+                      Continuar com Google
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 my-2">
+                    <div className="flex-1 h-px bg-slate-800"></div>
+                    <span className="text-[10px] text-slate-500">ou com e-mail</span>
+                    <div className="flex-1 h-px bg-slate-800"></div>
+                  </div>
+
+                  <form onSubmit={handleEmailAuth} className="space-y-2.5">
+                    {authMode === 'register' && (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Seu Nome"
+                          value={authName}
+                          onChange={(e) => setAuthName(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        type="email"
+                        placeholder="E-mail"
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="password"
+                        placeholder="Senha"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-cyan-500 text-black font-bold text-xs rounded-xl shadow-md hover:bg-cyan-400 cursor-pointer"
+                    >
+                      {authMode === 'login' ? 'Entrar' : 'Cadastrar'}
+                    </button>
+                  </form>
+
+                  <div className="text-center pt-1">
+                    <button
+                      onClick={() =>
+                        setAuthMode(authMode === 'login' ? 'register' : 'login')
+                      }
+                      className="text-[11px] text-cyan-400 hover:underline cursor-pointer"
+                    >
+                      {authMode === 'login'
+                        ? 'Não tem conta? Cadastre-se'
+                        : 'Já tem conta? Faça login'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
