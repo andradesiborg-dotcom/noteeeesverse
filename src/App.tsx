@@ -21,6 +21,7 @@ import {
   ChevronDown,
   X,
   CreditCard,
+  Zap,
 } from 'lucide-react';
 
 interface SavedNote {
@@ -51,25 +52,28 @@ const LANGUAGES = [
   { code: 'zh-CN', name: 'Mandarim' },
 ];
 
+// Mapeamento dos links dos Planos do Stripe
+const STRIPE_PLAN_LINKS: Record<string, string> = {
+  monthly: 'https://buy.stripe.com/test_fZu6oH5Zp2p486T7Dff3a00',
+  quarterly: 'https://buy.stripe.com/test_dRm3cv4Vl0gWaf17Dff3a01',
+  yearly: 'https://buy.stripe.com/test_4gM4gzbjJfbQ9aX1eRf3a02',
+};
+
 export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [activeTab, setActiveTab] = useState<
-    'transcribe' | 'translate' | 'summary' | 'saved' | 'pro'
+    'transcribe' | 'translate' | 'summary' | 'saved'
   >('transcribe');
   const [user, setUser] = useState<UserProfile | null>(null);
 
   // Modais e Autenticação
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
-  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
 
   const [authEmail, setAuthEmail] = useState<string>('');
   const [authPassword, setAuthPassword] = useState<string>('');
   const [authName, setAuthName] = useState<string>('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-
-  // Deteção se o utilizador está no Brasil (para liberar o Pix)
-  const [isBrazilUser, setIsBrazilUser] = useState<boolean>(false);
 
   // Seleção de itens a guardar na Nota
   const [saveOptions, setSaveOptions] = useState<{
@@ -116,14 +120,10 @@ export default function App() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // Inicialização e Deteção de Região (Idioma/Local)
+  // Inicialização
   useEffect(() => {
     const deviceLang = navigator.language || (navigator as any).userLanguage || 'pt';
     const langCode = deviceLang.split('-')[0].toLowerCase();
-
-    if (deviceLang.toLowerCase().includes('br') || deviceLang.toLowerCase().includes('pt-br')) {
-      setIsBrazilUser(true);
-    }
 
     const matchedLang = LANGUAGES.find((l) => l.code === langCode);
     if (matchedLang) {
@@ -171,7 +171,6 @@ export default function App() {
     };
     setUser(mockUser);
     localStorage.setItem('noteverse_user', JSON.stringify(mockUser));
-    setShowAuthModal(false);
   };
 
   const handleEmailAuth = (e: React.FormEvent) => {
@@ -188,7 +187,6 @@ export default function App() {
     };
     setUser(loggedUser);
     localStorage.setItem('noteverse_user', JSON.stringify(loggedUser));
-    setShowAuthModal(false);
   };
 
   const handleLogout = () => {
@@ -196,23 +194,17 @@ export default function App() {
     localStorage.removeItem('noteverse_user');
   };
 
-  // REDIRECIONAMENTO PARA CHECKOUT (Stripe ou Mercado Pago)
-  const handleCheckout = (paymentMethod: 'card' | 'pix' | 'applepay') => {
+  // REDIRECIONAMENTO DE CHECKOUT STRIPE POR PLANO
+  const handleSelectPlan = (planKey: 'monthly' | 'quarterly' | 'yearly') => {
     if (!user) {
       alert('Faça login primeiro para assinar o plano PRO!');
-      setShowAuthModal(true);
-      setShowPaymentModal(false);
       return;
     }
 
-    let checkoutUrl = 'https://buy.stripe.com/seu_link_stripe_global'; 
-
-    if (paymentMethod === 'pix' && isBrazilUser) {
-      checkoutUrl = 'https://link.mercadopago.com.br/seu_link_pix_brasil';
+    const stripeUrl = STRIPE_PLAN_LINKS[planKey];
+    if (stripeUrl) {
+      window.open(stripeUrl, '_blank');
     }
-
-    window.open(checkoutUrl, '_blank');
-    setShowPaymentModal(false);
   };
 
   const stopAudioAnalysis = () => {
@@ -526,9 +518,9 @@ export default function App() {
                 Note Verse
               </h1>
               <button
-                onClick={() => setShowPaymentModal(true)}
+                onClick={() => setShowAuthModal(true)}
                 className="cursor-pointer"
-                title="Clique para assinar o PRO"
+                title="Ver planos na conta"
               >
                 <span
                   style={{
@@ -538,7 +530,7 @@ export default function App() {
                   }}
                   className="text-[10px] border px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm hover:opacity-80"
                 >
-                  <Crown size={10} /> {user?.isPro ? 'PRO' : 'ASSINAR PRO'}
+                  <Crown size={10} /> {user?.isPro ? 'PRO' : 'VER PLANOS'}
                 </span>
               </button>
             </div>
@@ -585,7 +577,7 @@ export default function App() {
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
         >
           {/* Estúdio de Entrada */}
-          {activeTab !== 'saved' && activeTab !== 'pro' && (
+          {activeTab !== 'saved' && (
             <div
               style={{
                 backgroundColor: colors.cardBg,
@@ -610,7 +602,7 @@ export default function App() {
               {/* Gravador ou Ficheiro */}
               {isRecording ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <span className="text-xs text-red-400 font-bold">A gravar voz...</span>
+                  <span className="text-xs text-red-400 font-bold">Gravando voz...</span>
                   <div className="flex items-center gap-1.5 h-8">
                     {[0.6, 1, 0.4, 0.8, 1.2, 0.7, 0.5, 0.9, 0.3].map((factor, idx) => (
                       <div
@@ -786,7 +778,7 @@ export default function App() {
 
               {isTranslating ? (
                 <div className="text-xs text-cyan-400 font-bold animate-pulse py-2">
-                  A traduzir texto...
+                  Traduzindo texto...
                 </div>
               ) : (
                 <p className="text-xs leading-relaxed opacity-90 max-h-40 overflow-y-auto">
@@ -900,66 +892,15 @@ export default function App() {
               )}
             </div>
           )}
-
-          {/* ABA 5: PLANO PRO (Sempre visível no menu inferior) */}
-          {activeTab === 'pro' && (
-            <div
-              style={{
-                backgroundColor: colors.cardBg,
-                borderColor: colors.cardBorder,
-              }}
-              className="border p-5 rounded-2xl shadow-lg space-y-4 text-center"
-            >
-              <div className="w-12 h-12 bg-cyan-500/20 text-cyan-400 rounded-full mx-auto flex items-center justify-center border border-cyan-500/30">
-                <Crown size={24} />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-cyan-400">Note Verse PRO</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Desbloqueie traduções avançadas sem limite, resumos inteligentes automáticos e armazenamento expandido. Sem mensalidades fixas.
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <button
-                  onClick={() => handleCheckout('card')}
-                  className="w-full py-3 bg-slate-800 text-white border border-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-700 cursor-pointer shadow-sm"
-                >
-                  <CreditCard size={16} className="text-cyan-400" />
-                  <span>Pagar com Cartão de Crédito</span>
-                </button>
-
-                <button
-                  onClick={() => handleCheckout('applepay')}
-                  className="w-full py-3 bg-black text-white border border-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-900 cursor-pointer shadow-sm"
-                >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.31c.65-.79 1.09-1.89.97-2.99-.94.04-2.08.63-2.74 1.42-.58.68-1.09 1.79-.95 2.88 1.05.08 2.07-.51 2.72-1.31z"/>
-                  </svg>
-                  <span>Pagar com Apple Pay</span>
-                </button>
-
-                {isBrazilUser && (
-                  <button
-                    onClick={() => handleCheckout('pix')}
-                    className="w-full py-3 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-600/30 cursor-pointer shadow-sm"
-                  >
-                    <span className="font-black text-emerald-400">⚡</span>
-                    <span>Pagar com Pix (Instantâneo - Brasil)</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
         </main>
 
-        {/* Menu Inferior (Atualizado com aba PRO) */}
+        {/* Menu Inferior (Apenas as opções padrão da aplicação) */}
         <footer
           style={{
             backgroundColor: colors.headerBg,
             borderTopColor: colors.borderHeader,
           }}
-          className="px-4 py-3 border-t flex justify-around items-center"
+          className="px-6 py-3 border-t flex justify-around items-center"
         >
           <button
             onClick={() => setActiveTab('transcribe')}
@@ -1005,78 +946,7 @@ export default function App() {
             <Bookmark size={18} />
             <span className="text-[10px]">Salvos</span>
           </button>
-          <button
-            onClick={() => setActiveTab('pro')}
-            className={`flex flex-col items-center gap-1 cursor-pointer ${
-              activeTab === 'pro'
-                ? 'text-cyan-400 font-bold'
-                : 'text-cyan-500/70 hover:text-cyan-400'
-            }`}
-          >
-            <Crown size={18} />
-            <span className="text-[10px]">PRO</span>
-          </button>
         </footer>
-
-        {/* MODAL DE PAGAMENTO DIRETO (Abre ao clicar no topo) */}
-        {showPaymentModal && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div
-              style={{
-                backgroundColor: colors.cardBg,
-                borderColor: colors.cardBorder,
-              }}
-              className="border w-full max-w-xs p-5 rounded-3xl shadow-2xl space-y-4 relative"
-            >
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-
-              <div className="text-center space-y-1 pt-1">
-                <div className="w-10 h-10 bg-cyan-500/20 text-cyan-400 rounded-full mx-auto flex items-center justify-center border border-cyan-500/30">
-                  <Crown size={20} />
-                </div>
-                <h3 className="text-base font-bold text-cyan-400">Assinar Note Verse PRO</h3>
-                <p className="text-[11px] text-slate-400">
-                  Acesso ilimitado a traduções, resumos e ferramentas avançadas.
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <button
-                  onClick={() => handleCheckout('card')}
-                  className="w-full py-2.5 bg-slate-800 text-white border border-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-700 cursor-pointer shadow-sm"
-                >
-                  <CreditCard size={16} className="text-cyan-400" />
-                  <span>Pagar com Cartão de Crédito</span>
-                </button>
-
-                <button
-                  onClick={() => handleCheckout('applepay')}
-                  className="w-full py-2.5 bg-black text-white border border-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-900 cursor-pointer shadow-sm"
-                >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.31c.65-.79 1.09-1.89.97-2.99-.94.04-2.08.63-2.74 1.42-.58.68-1.09 1.79-.95 2.88 1.05.08 2.07-.51 2.72-1.31z"/>
-                  </svg>
-                  <span>Pagar com Apple Pay</span>
-                </button>
-
-                {isBrazilUser && (
-                  <button
-                    onClick={() => handleCheckout('pix')}
-                    className="w-full py-2.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-600/30 cursor-pointer shadow-sm"
-                  >
-                    <span className="font-black text-emerald-400">⚡</span>
-                    <span>Pagar com Pix (Instantâneo)</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* MODAL SALVAR NOTA */}
         {showSaveModal && (
@@ -1159,7 +1029,7 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL AUTENTICAÇÃO E PERFIL */}
+        {/* MODAL DE CONTA E PLANOS INTEGRADOR (PERFIL) */}
         {showAuthModal && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <div
@@ -1167,7 +1037,7 @@ export default function App() {
                 backgroundColor: colors.cardBg,
                 borderColor: colors.cardBorder,
               }}
-              className="border w-full max-w-xs p-5 rounded-3xl shadow-2xl space-y-4 relative"
+              className="border w-full max-w-xs p-5 rounded-3xl shadow-2xl space-y-4 relative max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={() => setShowAuthModal(false)}
@@ -1177,39 +1047,101 @@ export default function App() {
               </button>
 
               {user ? (
-                <div className="space-y-4 text-center pt-2">
-                  <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-400 mx-auto flex items-center justify-center overflow-hidden">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
-                    ) : (
-                      <User size={32} className="text-cyan-400" />
-                    )}
+                /* PERFIL COM OS PLANOS INTEGRADOR NA MESMA TELA */
+                <div className="space-y-4 pt-1">
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-400 mx-auto flex items-center justify-center overflow-hidden">
+                      {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
+                      ) : (
+                        <User size={32} className="text-cyan-400" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold">{user.name}</h3>
+                      <p className="text-xs text-slate-400">{user.email}</p>
+                      <span className="inline-block mt-1.5 px-2.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-full font-bold uppercase">
+                        {user.isPro ? 'PLANO PRO ATIVO' : 'PLANO GRATUITO'}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold">{user.name}</h3>
-                    <p className="text-xs text-slate-400">{user.email}</p>
-                    <span className="inline-block mt-2 px-2.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-full font-bold">
-                      {user.isPro ? 'PLANO PRO ATIVO' : 'PLANO GRATUITO'}
-                    </span>
+
+                  {/* SEÇÃO DOS PLANOS DENTRO DO MENU DA CONTA */}
+                  <div className="border-t border-slate-800 pt-3 space-y-2.5">
+                    <div className="text-center">
+                      <h4 className="text-xs font-bold text-cyan-400 flex items-center justify-center gap-1">
+                        <Crown size={14} /> Planos de Assinatura PRO
+                      </h4>
+                      <p className="text-[10px] text-slate-400">Pagamento seguro via Stripe (Cartão & Apple Pay)</p>
+                    </div>
+
+                    {/* CARD PLANO MENSAL */}
+                    <div className="bg-slate-900/60 border border-slate-800 p-2.5 rounded-xl space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] font-bold">Mensal</span>
+                        <span className="text-xs font-black text-cyan-400">R$ 29,90 <span className="text-[9px] font-normal text-slate-400">/mês</span></span>
+                      </div>
+                      <button
+                        onClick={() => handleSelectPlan('monthly')}
+                        className="w-full py-1.5 bg-slate-800 text-cyan-400 border border-slate-700 text-[11px] font-bold rounded-lg hover:bg-slate-700 cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <CreditCard size={12} /> Assinar Mensal
+                      </button>
+                    </div>
+
+                    {/* CARD PLANO TRIMESTRAL (20% OFF) */}
+                    <div className="bg-slate-900/60 border border-cyan-500/40 p-2.5 rounded-xl space-y-1.5 relative">
+                      <span className="absolute -top-2 right-2 bg-cyan-500 text-black text-[8px] font-black px-1.5 py-0.2 rounded uppercase">
+                        20% OFF
+                      </span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] font-bold text-cyan-400">Trimestral</span>
+                        <span className="text-xs font-black text-cyan-400">R$ 23,90 <span className="text-[9px] font-normal text-slate-400">/mês</span></span>
+                      </div>
+                      <button
+                        onClick={() => handleSelectPlan('quarterly')}
+                        className="w-full py-1.5 bg-cyan-500 text-black text-[11px] font-bold rounded-lg hover:bg-cyan-400 cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                      >
+                        <Zap size={12} /> Assinar Trimestral
+                      </button>
+                    </div>
+
+                    {/* CARD PLANO ANUAL (40% OFF) */}
+                    <div className="bg-slate-900/60 border border-emerald-500/40 p-2.5 rounded-xl space-y-1.5 relative">
+                      <span className="absolute -top-2 right-2 bg-emerald-500 text-black text-[8px] font-black px-1.5 py-0.2 rounded uppercase">
+                        40% OFF
+                      </span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] font-bold text-emerald-400">Anual</span>
+                        <span className="text-xs font-black text-emerald-400">R$ 17,90 <span className="text-[9px] font-normal text-slate-400">/mês</span></span>
+                      </div>
+                      <button
+                        onClick={() => handleSelectPlan('yearly')}
+                        className="w-full py-1.5 bg-emerald-500 text-black text-[11px] font-bold rounded-lg hover:bg-emerald-400 cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                      >
+                        <Crown size={12} /> Assinar Anual
+                      </button>
+                    </div>
                   </div>
 
                   <button
                     onClick={handleLogout}
-                    className="w-full py-2 bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-red-500/30 cursor-pointer"
+                    className="w-full py-2 bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-red-500/30 cursor-pointer pt-2"
                   >
                     <LogOut size={14} /> Sair da Conta
                   </button>
                 </div>
               ) : (
+                /* FORMULÁRIO DE LOGIN / CADASTRO */
                 <div className="space-y-4 pt-1">
                   <div>
                     <h3 className="text-base font-bold text-cyan-400">
-                      {authMode === 'login' ? 'Aceder Note Verse' : 'Criar Conta'}
+                      {authMode === 'login' ? 'Acessar Note Verse' : 'Criar Conta'}
                     </h3>
                     <p className="text-[11px] text-slate-400">
                       {authMode === 'login'
                         ? 'Entre para sincronizar suas notas.'
-                        : 'Registe-se para desbloquear recursos.'}
+                        : 'Cadastre-se para desbloquear recursos.'}
                     </p>
                   </div>
 
@@ -1252,7 +1184,7 @@ export default function App() {
                       <div>
                         <input
                           type="text"
-                          placeholder="O seu Nome"
+                          placeholder="Seu Nome"
                           value={authName}
                           onChange={(e) => setAuthName(e.target.value)}
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
@@ -1271,7 +1203,7 @@ export default function App() {
                     <div>
                       <input
                         type="password"
-                        placeholder="Palavra-passe"
+                        placeholder="Senha"
                         value={authPassword}
                         onChange={(e) => setAuthPassword(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
@@ -1282,7 +1214,7 @@ export default function App() {
                       type="submit"
                       className="w-full py-2.5 bg-cyan-500 text-black font-bold text-xs rounded-xl shadow-md hover:bg-cyan-400 cursor-pointer"
                     >
-                      {authMode === 'login' ? 'Entrar' : 'Registar'}
+                      {authMode === 'login' ? 'Entrar' : 'Cadastrar'}
                     </button>
                   </form>
 
@@ -1294,7 +1226,7 @@ export default function App() {
                       className="text-[11px] text-cyan-400 hover:underline cursor-pointer"
                     >
                       {authMode === 'login'
-                        ? 'Não tem conta? Registe-se'
+                        ? 'Não tem conta? Cadastre-se'
                         : 'Já tem conta? Faça login'}
                     </button>
                   </div>
